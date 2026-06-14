@@ -1,0 +1,113 @@
+from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
+from typing import List
+import json
+import numpy as np
+import os
+import sys
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Ensure backend directory is in sys.path for direct execution or as a module
+current_dir = os.path.dirname(os.path.realpath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
+
+try:
+    import models, schemas, database, utils
+    from database import engine, get_db
+except ImportError:
+    from . import models, schemas, database, utils
+    from .database import engine, get_db
+
+# Create database tables
+models.Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="Facial Recognition API")
+
+# Add CORS Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # In production, replace with your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.post("/register", response_model=schemas.User)
+async def register_user(name: str = Form(...), file: UploadFile = File(...), db: Session = Depends(get_db)):
+    logger.info(f"Received registration request for user: {name}")
+    # Check if user already exists
+    db_user = db.query(models.User).filter(models.User.name == name).first()
+    if db_user:
+        logger.warning(f"User {name} already registered")
+        raise HTTPException(status_code=400, detail="User already registered")
+
+    contents = await file.read()
+    # Run heavy CPU task in a thread pool to avoid blocking the event loop
+    encoding = await run_in_threadpool(utils.get_face_encoding, contents)
+    
+    if encoding is None:
+        logger.warning(f"No face detected for user: {name}")
+        raise HTTPException(status_code=400, detail="No face detected in the image")
+
+    new_user = models.User(name=name, encoding=json.dumps(encoding))
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    logger.info(f"User {name} registered successfully")
+    return new_user
+
+@app.post("/recognize")
+async def recognize_user(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    logger.info("Received recognition request")
+    contents = await file.read()
+    # Run heavy CPU task in a thread pool
+    encoding = await run_in_threadpool(utils.get_face_encoding, contents)
+    
+    if encoding is None:
+        logger.warning("No face detected in recognition attempt")
+        raise HTTPException(status_code=400, detail="No face detected in the image")
+
+    users = db.query(models.User).all()
+    best_match = None
+    min_distance = 1.0 # Cosine distance max is 2.0
+
+    for user in users:
+        stored_encoding = json.loads(user.encoding)
+        a = np.array(encoding)
+        b = np.array(stored_encoding)
+        distance = 1 - np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+        
+        if distance < 0.4 and distance < min_distance:
+            min_distance = distance
+            best_match = user.name
+
+    if best_match:
+        logger.info(f"Match found: {best_match} (distance: {min_distance})")
+        return {"match": True, "name": best_match, "distance": float(min_distance)}
+    else:
+        logger.info("No match found")
+        return {"match": False, "detail": "No match found"}
+
+@app.get("/profiles", response_model=List[schemas.User])
+def get_profiles(db: Session = Depends(get_db)):
+    return db.query(models.User).all()
+
+@app.delete("/profiles/{user_id}")
+def delete_profile(user_id: int, db: Session = Depends(get_db)):
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    db.delete(db_user)
+    db.commit()
+    return {"message": f"User {user_id} deleted"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
