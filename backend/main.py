@@ -40,13 +40,13 @@ app.add_middleware(
 )
 
 @app.post("/register", response_model=schemas.User)
-async def register_user(name: str = Form(...), file: UploadFile = File(...), db: Session = Depends(get_db)):
-    logger.info(f"Received registration request for user: {name}")
-    # Check if user already exists
-    db_user = db.query(models.User).filter(models.User.name == name).first()
+async def register_user(name: str = Form(...), matric_number: str = Form(...), file: UploadFile = File(...), db: Session = Depends(get_db)):
+    logger.info(f"Received registration request for user: {name} ({matric_number})")
+    # Check if matric number already exists
+    db_user = db.query(models.User).filter(models.User.matric_number == matric_number).first()
     if db_user:
-        logger.warning(f"User {name} already registered")
-        raise HTTPException(status_code=400, detail="User already registered")
+        logger.warning(f"Matric number {matric_number} already registered")
+        raise HTTPException(status_code=400, detail="Matric number already registered")
 
     contents = await file.read()
     # Run heavy CPU task in a thread pool to avoid blocking the event loop
@@ -56,7 +56,7 @@ async def register_user(name: str = Form(...), file: UploadFile = File(...), db:
         logger.warning(f"No face detected for user: {name}")
         raise HTTPException(status_code=400, detail="No face detected in the image")
 
-    new_user = models.User(name=name, encoding=json.dumps(encoding))
+    new_user = models.User(name=name, matric_number=matric_number, encoding=json.dumps(encoding))
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -86,11 +86,11 @@ async def recognize_user(file: UploadFile = File(...), db: Session = Depends(get
         
         if distance < 0.4 and distance < min_distance:
             min_distance = distance
-            best_match = user.name
+            best_match = {"name": user.name, "matric_number": user.matric_number}
 
     if best_match:
-        logger.info(f"Match found: {best_match} (distance: {min_distance})")
-        return {"match": True, "name": best_match, "distance": float(min_distance)}
+        logger.info(f"Match found: {best_match['name']} (distance: {min_distance})")
+        return {"match": True, **best_match, "distance": float(min_distance)}
     else:
         logger.info("No match found")
         return {"match": False, "detail": "No match found"}

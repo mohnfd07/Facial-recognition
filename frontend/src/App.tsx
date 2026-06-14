@@ -9,6 +9,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 const App = () => {
   const [mode, setMode] = useState<'register' | 'recognize' | 'profiles'>('recognize');
   const [name, setName] = useState('');
+  const [matricNumber, setMatricNumber] = useState('');
   const [profiles, setProfiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -90,15 +91,17 @@ const App = () => {
 
     try {
       if (mode === 'register') {
-        if (!name) {
-          setError('Please enter a name');
+        if (!name || !matricNumber) {
+          setError('Please enter both name and matric number');
           setLoading(false);
           return;
         }
         formData.append('name', name);
+        formData.append('matric_number', matricNumber);
         const response = await axios.post(`${API_BASE_URL}/register`, formData);
-        setResult({ success: true, message: `Registered ${response.data.name} successfully!` });
+        setResult({ success: true, message: `Registered ${response.data.name} (${response.data.matric_number}) successfully!` });
         setName('');
+        setMatricNumber('');
       } else {
         const response = await axios.post(`${API_BASE_URL}/recognize`, formData);
         setResult(response.data);
@@ -108,7 +111,7 @@ const App = () => {
     } finally {
       setLoading(false);
     }
-  }, [mode, name, webcamRef]);
+  }, [mode, name, matricNumber, webcamRef]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans p-4 md:p-8">
@@ -170,15 +173,27 @@ const App = () => {
                 </div>
 
                 {mode === 'register' && (
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Registration Name</label>
-                    <input 
-                      type="text" 
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Enter full name"
-                      className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-                    />
+                  <div className="space-y-4 mb-6">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Registration Name</label>
+                      <input 
+                        type="text" 
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Enter full name"
+                        className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Matric Number</label>
+                      <input 
+                        type="text" 
+                        value={matricNumber}
+                        onChange={(e) => setMatricNumber(e.target.value)}
+                        placeholder="Enter matric number"
+                        className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -227,6 +242,9 @@ const App = () => {
                       {result.name && (
                         <p className="text-4xl font-black mt-2 tracking-tight uppercase">{result.name}</p>
                       )}
+                      {result.matric_number && (
+                        <p className="text-lg text-slate-500 font-bold mt-1">MATRIC: {result.matric_number}</p>
+                      )}
                       {result.distance && (
                         <p className="text-xs text-slate-400 mt-2 italic font-mono">
                           Confidence Gap: {(result.distance * 100).toFixed(1)}%
@@ -268,7 +286,8 @@ const App = () => {
                         </div>
                         <div>
                           <h3 className="font-bold text-slate-800">{p.name}</h3>
-                          <p className="text-xs text-slate-400">ID: {p.id.toString().padStart(4, '0')}</p>
+                          <p className="text-xs text-indigo-600 font-semibold">{p.matric_number}</p>
+                          <p className="text-[10px] text-slate-400">ID: {p.id.toString().padStart(4, '0')}</p>
                         </div>
                       </div>
                       <button 

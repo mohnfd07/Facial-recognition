@@ -3,6 +3,7 @@ from typing import List
 
 class UserBase(BaseModel):
     name: str
+    matric_number: str
 
 class UserCreate(UserBase):
     encoding: str
