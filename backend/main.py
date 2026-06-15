@@ -37,7 +37,7 @@ def health_check():
 # Add CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://facial-recognition-eta.vercel.app/"], # In production, replace with your frontend URL
+    allow_origins=["https://facialbro.vercel.app/","https://facialbro.vercel.app"], # In production, replace with your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
