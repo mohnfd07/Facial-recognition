@@ -4,7 +4,7 @@ import axios from 'axios';
 import { Camera as CameraIcon, UserPlus, Search, Users, RefreshCw, AlertCircle, CheckCircle2, Trash2 } from 'lucide-react';
 
 // Use environment variable for API URL with fallback
-const API_BASE_URL = "https://facial-recognition-u7z5.onrender.com/";
+const API_BASE_URL = "https://facial-recognition-u7z5.onrender.com";
 
 const App = () => {
   const [mode, setMode] = useState<'register' | 'recognize' | 'profiles'>('recognize');
