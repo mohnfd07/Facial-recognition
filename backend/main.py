@@ -30,10 +30,14 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Facial Recognition API")
 
+@app.get("/")
+def health_check():
+    return {"status": "ok", "message": "Facial Recognition API is running"}
+
 # Add CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, replace with your frontend URL
+    allow_origins=["https://facial-recognition-eta.vercel.app/"], # In production, replace with your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
