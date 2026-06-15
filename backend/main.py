@@ -19,10 +19,10 @@ if current_dir not in sys.path:
     sys.path.append(current_dir)
 
 try:
-    import models, schemas, database, utils
+    import models, schemas, utils
     from database import engine, get_db
 except ImportError:
-    from . import models, schemas, database, utils
+    from .import models, schemas, utils, database
     from .database import engine, get_db
 
 # Create database tables
