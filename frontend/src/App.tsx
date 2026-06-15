@@ -3,10 +3,8 @@ import Webcam from 'react-webcam';
 import axios from 'axios';
 import { Camera as CameraIcon, UserPlus, Search, Users, RefreshCw, AlertCircle, CheckCircle2, Trash2 } from 'lucide-react';
 
-// Use local backend if running on localhost, otherwise use production URL
-const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? 'http://localhost:8000' 
-  : 'https://facial-recognition-u7z5.onrender.com';
+// Use environment variable for API URL with fallback
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 const App = () => {
   const [mode, setMode] = useState<'register' | 'recognize' | 'profiles'>('recognize');

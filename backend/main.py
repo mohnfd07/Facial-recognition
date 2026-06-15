@@ -19,12 +19,10 @@ if current_dir not in sys.path:
     sys.path.append(current_dir)
 
 # Absolute imports for maximum reliability
-try:
-    import models, schemas, utils, database
-    from database import engine, get_db
-except ImportError:
-    from . import models, schemas, utils, database
-    from .database import engine, get_db
+import models
+import schemas
+import utils
+from database import engine, get_db
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
