@@ -13,16 +13,17 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Ensure backend directory is in sys.path for direct execution or as a module
+# Ensure backend directory is in sys.path
 current_dir = os.path.dirname(os.path.realpath(__file__))
 if current_dir not in sys.path:
     sys.path.append(current_dir)
 
+# Absolute imports for maximum reliability
 try:
-    import models, schemas, utils
+    import models, schemas, utils, database
     from database import engine, get_db
 except ImportError:
-    from .import models, schemas, utils, database
+    from . import models, schemas, utils, database
     from .database import engine, get_db
 
 # Create database tables
@@ -37,7 +38,11 @@ def health_check():
 # Add CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://facialbro.vercel.app/","https://facialbro.vercel.app"], # In production, replace with your frontend URL
+    allow_origins=[
+        "https://facial-recognition-eta.vercel.app",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

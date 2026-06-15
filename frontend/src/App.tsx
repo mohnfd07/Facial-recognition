@@ -4,7 +4,7 @@ import axios from 'axios';
 import { Camera as CameraIcon, UserPlus, Search, Users, RefreshCw, AlertCircle, CheckCircle2, Trash2 } from 'lucide-react';
 
 // Use local backend if running on localhost, otherwise use production URL
-const API_BASE_URL = window.location.hostname === 'localhost' 
+const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   ? 'http://localhost:8000' 
   : 'https://facial-recognition-u7z5.onrender.com';
 
