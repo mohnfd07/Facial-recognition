@@ -105,11 +105,11 @@ async def recognize_user(file: UploadFile = File(...), db: Session = Depends(get
         return {"match": False, "detail": "No match found"}
 
 @app.get("/profiles", response_model=List[schemas.User])
-def get_profiles(db: Session = Depends(get_db)):
+def get_profiles(db: Session = Depends(get_db), authenticated: bool = Depends(verify_admin)):
     return db.query(models.User).all()
 
 @app.delete("/profiles/{user_id}")
-def delete_profile(user_id: int, db: Session = Depends(get_db)):
+def delete_profile(user_id: int, db: Session = Depends(get_db), authenticated: bool = Depends(verify_admin)):
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -118,7 +118,7 @@ def delete_profile(user_id: int, db: Session = Depends(get_db)):
     return {"message": f"User {user_id} deleted"}
 
 @app.delete("/profiles")
-def delete_all_profiles(db: Session = Depends(get_db)):
+def delete_all_profiles(db: Session = Depends(get_db), authenticated: bool = Depends(verify_admin)):
     db.query(models.User).delete()
     db.commit()
     return {"message": "All profiles deleted"}
@@ -126,6 +126,10 @@ def delete_all_profiles(db: Session = Depends(get_db)):
 if __name__ == "__main__":
     import uvicorn
     # Get port from environment variable (standard for Railway/Render)
+    port = int(os.environ.get("PORT", 8000))
+    logger.info(f"Starting server on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
+le (standard for Railway/Render)
     port = int(os.environ.get("PORT", 8000))
     logger.info(f"Starting server on port {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
