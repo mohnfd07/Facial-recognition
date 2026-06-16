@@ -2,7 +2,6 @@
 FROM python:3.11-slim
 
 # Install system libraries needed for OpenCV and AI processing
-# libgl1 replaces the obsolete libgl1-mesa-glx
 RUN apt-get update && apt-get install -y \
     libgl1 \
     libglib2.0-0 \
@@ -23,5 +22,6 @@ COPY . .
 # Ensure uvicorn is installed
 RUN pip install uvicorn
 
-# Command to run the application using JSON array format
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Use the shell form of CMD to allow environment variable expansion ($PORT)
+# Railway automatically provides the PORT variable.
+CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
