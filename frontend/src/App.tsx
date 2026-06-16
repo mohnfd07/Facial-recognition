@@ -391,6 +391,11 @@ const App = () => {
                       <h2 className="text-2xl font-bold">{result.success ? "Success" : result.match ? "Match Found" : "No Match"}</h2>
                       {result.name && <p className="text-4xl font-black mt-2 tracking-tight uppercase">{result.name}</p>}
                       {result.matric_number && <p className="text-lg text-slate-500 dark:text-slate-400 font-bold mt-1">MATRIC: {result.matric_number}</p>}
+                      {result.distance && (
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 italic font-mono">
+                          Confidence Gap: {(result.distance * 100).toFixed(1)}%
+                        </p>
+                      )}
                       {result.message && <p className="text-slate-600 dark:text-slate-400 mt-2">{result.message}</p>}
                     </div>
                   )}
@@ -543,7 +548,10 @@ const App = () => {
                                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${log.success ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30'}`}>{log.success ? 'OK' : 'FAIL'}</span>
                                 </td>
                                 <td className="py-3 text-slate-400 font-mono text-[10px]">{log.distance !== 'N/A' ? `${(parseFloat(log.distance) * 100).toFixed(1)}%` : '-'}</td>
-                                <td className="py-3 text-right text-slate-400 text-[10px]">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                                <td className="py-3 text-right text-slate-400 text-[10px]">
+                                  <div className="font-bold">{new Date(log.timestamp).toLocaleDateString()}</div>
+                                  <div>{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                </td>
                               </tr>
                             ))
                           )}
