@@ -88,6 +88,12 @@ async def recognize_user(file: UploadFile = File(...), db: Session = Depends(get
 
     for user in users:
         stored_encoding = json.loads(user.encoding)
+        
+        # Skip profiles that don't match the current model's encoding size (e.g., VGG vs Facenet)
+        if len(stored_encoding) != len(encoding):
+            logger.warning(f"Skipping profile {user.name}: encoding size mismatch")
+            continue
+
         a = np.array(encoding)
         b = np.array(stored_encoding)
         distance = 1 - np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
