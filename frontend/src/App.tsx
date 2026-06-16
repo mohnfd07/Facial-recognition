@@ -1,7 +1,18 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import axios from 'axios';
-import { Camera as CameraIcon, UserPlus, Search, Users, RefreshCw, AlertCircle, CheckCircle2, Trash2 } from 'lucide-react';
+import { 
+  Camera as CameraIcon, 
+  UserPlus, 
+  Search, 
+  Users, 
+  RefreshCw, 
+  AlertCircle, 
+  CheckCircle2, 
+  Trash2,
+  Sun,
+  Moon
+} from 'lucide-react';
 
 // Use local backend if running on localhost, otherwise use production Railway URL
 // Force Vercel Redeploy - Build Timestamp: 2026-06-15
@@ -10,7 +21,7 @@ const API_BASE_URL = (window.location.hostname === 'localhost' || window.locatio
   : 'https://facial-rec-fm.up.railway.app';
 
 const App = () => {
-  const [mode, setMode] = useState<'register' | 'recognize' | 'profiles'>('recognize');
+  const [mode, setMode] = useState<'recognize' | 'register' | 'profiles'>('recognize');
   const [name, setName] = useState('');
   const [matricNumber, setMatricNumber] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
@@ -18,7 +29,21 @@ const App = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('darkMode');
+    return saved ? JSON.parse(saved) : window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+  
   const webcamRef = useRef<Webcam>(null);
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('darkMode', JSON.stringify(darkMode));
+  }, [darkMode]);
 
   const fetchProfiles = async () => {
     let password = adminPassword;
@@ -147,39 +172,58 @@ const App = () => {
   }, [mode, name, matricNumber, webcamRef]);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans p-4 md:p-8">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-50 font-sans p-4 md:p-8 transition-colors duration-300">
       <div className="max-w-4xl mx-auto">
         <header className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-indigo-600">FaceAuth</h1>
-            <p className="text-slate-500">Secure Facial Recognition System</p>
+          <div className="flex items-center justify-between w-full md:w-auto">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-indigo-600 dark:text-indigo-400">FaceAuth</h1>
+              <p className="text-slate-500 dark:text-slate-400">Secure Facial Recognition System</p>
+            </div>
+            <button 
+              onClick={() => setDarkMode(!darkMode)}
+              className="md:hidden p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
+            >
+              {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
           </div>
-          <nav className="flex bg-white rounded-lg shadow-sm border p-1">
+          
+          <div className="flex items-center gap-4 w-full md:w-auto">
+            <nav className="flex flex-1 md:flex-none bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800 p-1">
+              <button 
+                onClick={() => setMode('recognize')}
+                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-all ${mode === 'recognize' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
+              >
+                <Search size={18} /> <span className="hidden sm:inline">Recognize</span>
+              </button>
+              <button 
+                onClick={() => setMode('register')}
+                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-all ${mode === 'register' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
+              >
+                <UserPlus size={18} /> <span className="hidden sm:inline">Register</span>
+              </button>
+              <button 
+                onClick={fetchProfiles}
+                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-all ${mode === 'profiles' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
+              >
+                <Users size={18} /> <span className="hidden sm:inline">Profiles</span>
+              </button>
+            </nav>
+            
             <button 
-              onClick={() => setMode('recognize')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all ${mode === 'recognize' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100'}`}
+              onClick={() => setDarkMode(!darkMode)}
+              className="hidden md:flex p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
             >
-              <Search size={18} /> Recognize
+              {darkMode ? <Sun size={20} /> : <Moon size={20} />}
             </button>
-            <button 
-              onClick={() => setMode('register')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all ${mode === 'register' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100'}`}
-            >
-              <UserPlus size={18} /> Register
-            </button>
-            <button 
-              onClick={fetchProfiles}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all ${mode === 'profiles' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100'}`}
-            >
-              <Users size={18} /> Profiles
-            </button>
-          </nav>
+          </div>
         </header>
 
         <main className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {mode !== 'profiles' ? (
             <>
-              <div className="bg-white p-6 rounded-2xl shadow-xl border border-slate-200">
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800">
                 <div className="relative rounded-xl overflow-hidden bg-slate-900 aspect-video mb-6">
                   <Webcam
                     audio={false}
@@ -208,23 +252,23 @@ const App = () => {
                 {mode === 'register' && (
                   <div className="space-y-4 mb-6">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Registration Name</label>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Registration Name</label>
                       <input 
                         type="text" 
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Enter full name"
-                        className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                        className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Matric Number</label>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Matric Number</label>
                       <input 
                         type="text" 
                         value={matricNumber}
                         onChange={(e) => setMatricNumber(e.target.value)}
                         placeholder="Enter matric number"
-                        className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                        className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                       />
                     </div>
                   </div>
@@ -233,7 +277,7 @@ const App = () => {
                 <button 
                   onClick={capture}
                   disabled={loading}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-semibold py-4 rounded-xl shadow-lg shadow-indigo-200 flex items-center justify-center gap-3 transition-all active:scale-[0.98]"
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-semibold py-4 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none flex items-center justify-center gap-3 transition-all active:scale-[0.98]"
                 >
                   <CameraIcon size={24} />
                   {mode === 'register' ? 'Register Face' : 'Identify Face'}
@@ -241,10 +285,10 @@ const App = () => {
               </div>
 
               <div className="flex flex-col gap-6">
-                <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-200 min-h-[300px] flex flex-col justify-center items-center text-center">
+                <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 min-h-[300px] flex flex-col justify-center items-center text-center">
                   {!result && !error && !loading && (
-                    <div className="text-slate-400">
-                      <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4 mx-auto">
+                    <div className="text-slate-400 dark:text-slate-500">
+                      <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4 mx-auto">
                         <CameraIcon size={32} />
                       </div>
                       <p className="text-lg font-medium">Capture a photo to begin</p>
@@ -252,10 +296,10 @@ const App = () => {
                     </div>
                   )}
 
-                  {loading && <p className="text-indigo-600 font-medium animate-pulse">Processing image...</p>}
+                  {loading && <p className="text-indigo-600 dark:text-indigo-400 font-medium animate-pulse">Processing image...</p>}
 
                   {error && (
-                    <div className="text-red-500">
+                    <div className="text-red-500 dark:text-red-400">
                       <AlertCircle size={48} className="mb-4 mx-auto" />
                       <p className="text-lg font-bold">Detection Error</p>
                       <p className="text-sm">{error}</p>
@@ -263,7 +307,7 @@ const App = () => {
                   )}
 
                   {result && (
-                    <div className={result.match || result.success ? "text-emerald-600" : "text-amber-500"}>
+                    <div className={result.match || result.success ? "text-emerald-600 dark:text-emerald-400" : "text-amber-500 dark:text-amber-400"}>
                       {result.match || result.success ? (
                         <CheckCircle2 size={64} className="mb-4 mx-auto" />
                       ) : (
@@ -276,21 +320,21 @@ const App = () => {
                         <p className="text-4xl font-black mt-2 tracking-tight uppercase">{result.name}</p>
                       )}
                       {result.matric_number && (
-                        <p className="text-lg text-slate-500 font-bold mt-1">MATRIC: {result.matric_number}</p>
+                        <p className="text-lg text-slate-500 dark:text-slate-400 font-bold mt-1">MATRIC: {result.matric_number}</p>
                       )}
                       {result.distance && (
-                        <p className="text-xs text-slate-400 mt-2 italic font-mono">
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 italic font-mono">
                           Confidence Gap: {(result.distance * 100).toFixed(1)}%
                         </p>
                       )}
-                      {result.message && <p className="text-slate-600 mt-2">{result.message}</p>}
+                      {result.message && <p className="text-slate-600 dark:text-slate-400 mt-2">{result.message}</p>}
                     </div>
                   )}
                 </div>
 
-                <div className="bg-indigo-600 p-6 rounded-2xl shadow-xl text-white">
+                <div className="bg-indigo-600 dark:bg-indigo-700 p-6 rounded-2xl shadow-xl text-white">
                   <h3 className="font-bold text-lg mb-2">Tips for better results</h3>
-                  <ul className="text-indigo-100 text-sm space-y-2 list-disc list-inside">
+                  <ul className="text-indigo-100 space-y-2 list-disc list-inside text-sm">
                     <li>Ensure good lighting on your face</li>
                     <li>Avoid wearing sunglasses or hats</li>
                     <li>Look directly into the camera</li>
@@ -301,37 +345,37 @@ const App = () => {
             </>
           ) : (
             <div className="col-span-full flex flex-col gap-4">
-              <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                <h2 className="text-xl font-bold text-slate-800">Registered Profiles ({profiles.length})</h2>
+              <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">Registered Profiles ({profiles.length})</h2>
                 <button 
                   onClick={clearProfiles}
-                  className="text-red-500 hover:bg-red-50 px-4 py-2 rounded-lg text-sm font-semibold transition-all border border-transparent hover:border-red-100 flex items-center gap-2"
+                  className="text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 px-4 py-2 rounded-lg text-sm font-semibold transition-all border border-transparent hover:border-red-100 dark:hover:border-red-900/30 flex items-center gap-2"
                 >
                   <Trash2 size={16} /> Clear All
                 </button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {profiles.length === 0 ? (
-                  <div className="col-span-full bg-white p-12 rounded-2xl text-center border border-dashed border-slate-300">
-                    <Users size={48} className="text-slate-300 mx-auto mb-4" />
-                    <p className="text-slate-500 font-medium">No registered profiles yet</p>
+                  <div className="col-span-full bg-white dark:bg-slate-900 p-12 rounded-2xl text-center border border-dashed border-slate-300 dark:border-slate-700">
+                    <Users size={48} className="text-slate-300 dark:text-slate-600 mx-auto mb-4" />
+                    <p className="text-slate-500 dark:text-slate-400 font-medium">No registered profiles yet</p>
                   </div>
                 ) : (
                   profiles.map((p) => (
-                    <div key={p.id} className="bg-white p-6 rounded-xl shadow-md border border-slate-200 flex items-center justify-between gap-4">
+                    <div key={p.id} className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-md border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xl">
+                        <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center font-bold text-xl">
                           {p.name[0].toUpperCase()}
                         </div>
                         <div>
-                          <h3 className="font-bold text-slate-800">{p.name}</h3>
-                          <p className="text-xs text-indigo-600 font-semibold">{p.matric_number}</p>
-                          <p className="text-[10px] text-slate-400">ID: {p.id.toString().padStart(4, '0')}</p>
+                          <h3 className="font-bold text-slate-800 dark:text-slate-100">{p.name}</h3>
+                          <p className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold">{p.matric_number}</p>
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500">ID: {p.id.toString().padStart(4, '0')}</p>
                         </div>
                       </div>
                       <button 
                         onClick={() => deleteProfile(p.id)}
-                        className="text-slate-400 hover:text-red-500 transition-colors p-2"
+                        className="text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-colors p-2"
                         title="Delete Profile"
                       >
                         <Trash2 size={20} />
