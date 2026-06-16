@@ -83,6 +83,10 @@ async def recognize_user(file: UploadFile = File(...), db: Session = Depends(get
     
     if encoding is None:
         logger.warning("No face detected in recognition attempt")
+        # Save a fail log
+        fail_log = models.RecognitionLog(success=False)
+        db.add(fail_log)
+        db.commit()
         raise HTTPException(status_code=400, detail="No face detected in the image")
 
     users = db.query(models.User).all()
@@ -104,6 +108,16 @@ async def recognize_user(file: UploadFile = File(...), db: Session = Depends(get
         if distance < 0.4 and distance < min_distance:
             min_distance = distance
             best_match = {"name": user.name, "matric_number": user.matric_number}
+
+    # Save log entry
+    log_entry = models.RecognitionLog(
+        name=best_match["name"] if best_match else "Unknown",
+        matric_number=best_match["matric_number"] if best_match else "N/A",
+        distance=str(round(float(min_distance), 4)) if best_match else "N/A",
+        success=True if best_match else False
+    )
+    db.add(log_entry)
+    db.commit()
 
     if best_match:
         logger.info(f"Match found: {best_match['name']} (distance: {min_distance})")
@@ -130,6 +144,16 @@ def delete_all_profiles(db: Session = Depends(get_db), authenticated: bool = Dep
     db.query(models.User).delete()
     db.commit()
     return {"message": "All profiles deleted"}
+
+@app.get("/logs", response_model=List[schemas.RecognitionLog])
+def get_logs(db: Session = Depends(get_db), authenticated: bool = Depends(verify_admin)):
+    return db.query(models.RecognitionLog).order_by(models.RecognitionLog.timestamp.desc()).limit(100).all()
+
+@app.delete("/logs")
+def delete_all_logs(db: Session = Depends(get_db), authenticated: bool = Depends(verify_admin)):
+    db.query(models.RecognitionLog).delete()
+    db.commit()
+    return {"message": "All logs cleared"}
 
 if __name__ == "__main__":
     import uvicorn

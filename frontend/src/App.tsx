@@ -11,24 +11,28 @@ import {
   CheckCircle2, 
   Trash2,
   Sun,
-  Moon
+  Moon,
+  History,
+  Info
 } from 'lucide-react';
 
 // Use local backend if running on localhost, otherwise use production Railway URL
-// Force Vercel Redeploy - Build Timestamp: 2026-06-15
+// Force Vercel Redeploy - Build Timestamp: 2026-06-16
 const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   ? 'http://localhost:8000' 
   : 'https://facial-rec-fm.up.railway.app';
 
 const App = () => {
-  const [mode, setMode] = useState<'recognize' | 'register' | 'profiles'>('recognize');
+  const [mode, setMode] = useState<'recognize' | 'register' | 'profiles' | 'history'>('recognize');
   const [name, setName] = useState('');
   const [matricNumber, setMatricNumber] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [profiles, setProfiles] = useState<any[]>([]);
+  const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [qualityTip, setQualityTip] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('darkMode');
     return saved ? JSON.parse(saved) : window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -69,6 +73,30 @@ const App = () => {
     }
   };
 
+  const fetchLogs = async () => {
+    let password = adminPassword;
+    if (!password) {
+      const input = window.prompt('Enter Admin Password:');
+      if (input === null) return;
+      password = input;
+    }
+
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API_BASE_URL}/logs`, {
+        headers: { 'X-Admin-Password': password }
+      });
+      setLogs(response.data);
+      setAdminPassword(password);
+      setMode('history');
+    } catch (err: any) {
+      setError(err.response?.status === 401 ? 'Invalid Admin Password' : 'Failed to fetch logs');
+      setAdminPassword('');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const deleteProfile = async (id: number) => {
     if (!window.confirm('Are you sure you want to delete this profile?')) return;
     setLoading(true);
@@ -100,6 +128,41 @@ const App = () => {
     }
   };
 
+  const clearLogs = async () => {
+    if (!window.confirm('Are you sure you want to clear the match history?')) return;
+    setLoading(true);
+    try {
+      await axios.delete(`${API_BASE_URL}/logs`, {
+        headers: { 'X-Admin-Password': adminPassword }
+      });
+      setLogs([]);
+    } catch (err) {
+      setError('Failed to clear logs');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkImageQuality = (canvas: HTMLCanvasElement): string | null => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    let brightness = 0;
+
+    for (let i = 0; i < data.length; i += 4) {
+      brightness += (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+    }
+
+    const avgBrightness = brightness / (canvas.width * canvas.height);
+
+    if (avgBrightness < 40) return "Image too dark. Improve lighting.";
+    if (avgBrightness > 220) return "Image too bright. Avoid direct light.";
+    
+    return null;
+  };
+
   const capture = useCallback(async () => {
     if (!webcamRef.current) return;
     const imageSrc = webcamRef.current.getScreenshot();
@@ -108,8 +171,8 @@ const App = () => {
     setLoading(true);
     setError(null);
     setResult(null);
+    setQualityTip(null);
 
-    // Create an image and a canvas to mask the output
     const img = new Image();
     img.src = imageSrc;
     await new Promise((resolve) => (img.onload = resolve));
@@ -120,25 +183,27 @@ const App = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Draw the original image
     ctx.drawImage(img, 0, 0);
 
-    // Calculate guide dimensions relative to the actual image size
+    // Quality Check before masking
+    const tip = checkImageQuality(canvas);
+    if (tip) {
+      setQualityTip(tip);
+      // We still proceed, but warn the user
+    }
+
     const maskWidth = img.width * 0.4;
     const maskHeight = img.height * 0.8;
     
-    // Create a clipping path for the oval
     ctx.globalCompositeOperation = 'destination-in';
     ctx.beginPath();
     ctx.ellipse(img.width / 2, img.height / 2, maskWidth / 2, maskHeight / 2, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Fill the background with black
     ctx.globalCompositeOperation = 'destination-over';
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Convert canvas to blob
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg'));
     if (!blob) return;
 
@@ -188,25 +253,31 @@ const App = () => {
             </button>
           </div>
           
-          <div className="flex items-center gap-4 w-full md:w-auto">
+          <div className="flex items-center gap-4 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
             <nav className="flex flex-1 md:flex-none bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800 p-1">
               <button 
                 onClick={() => setMode('recognize')}
-                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-all ${mode === 'recognize' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
+                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3 py-2 rounded-md transition-all text-sm font-medium ${mode === 'recognize' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
               >
-                <Search size={18} /> <span className="hidden sm:inline">Recognize</span>
+                <Search size={16} /> <span className="hidden sm:inline">Identify</span>
               </button>
               <button 
                 onClick={() => setMode('register')}
-                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-all ${mode === 'register' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
+                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3 py-2 rounded-md transition-all text-sm font-medium ${mode === 'register' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
               >
-                <UserPlus size={18} /> <span className="hidden sm:inline">Register</span>
+                <UserPlus size={16} /> <span className="hidden sm:inline">Register</span>
               </button>
               <button 
                 onClick={fetchProfiles}
-                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-all ${mode === 'profiles' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
+                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3 py-2 rounded-md transition-all text-sm font-medium ${mode === 'profiles' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
               >
-                <Users size={18} /> <span className="hidden sm:inline">Profiles</span>
+                <Users size={16} /> <span className="hidden sm:inline">Profiles</span>
+              </button>
+              <button 
+                onClick={fetchLogs}
+                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3 py-2 rounded-md transition-all text-sm font-medium ${mode === 'history' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
+              >
+                <History size={16} /> <span className="hidden sm:inline">History</span>
               </button>
             </nav>
             
@@ -221,7 +292,7 @@ const App = () => {
         </header>
 
         <main className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {mode !== 'profiles' ? (
+          {mode === 'recognize' || mode === 'register' ? (
             <>
               <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800">
                 <div className="relative rounded-xl overflow-hidden bg-slate-900 aspect-video mb-6">
@@ -241,6 +312,13 @@ const App = () => {
                       </div>
                     </div>
                   </div>
+
+                  {/* Quality Tip Overlay */}
+                  {qualityTip && (
+                    <div className="absolute bottom-4 left-4 right-4 bg-amber-500/90 text-white text-xs py-2 px-3 rounded-lg flex items-center gap-2 animate-bounce">
+                      <Info size={14} /> {qualityTip}
+                    </div>
+                  )}
 
                   {loading && (
                     <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-10">
@@ -343,7 +421,7 @@ const App = () => {
                 </div>
               </div>
             </>
-          ) : (
+          ) : mode === 'profiles' ? (
             <div className="col-span-full flex flex-col gap-4">
               <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
                 <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">Registered Profiles ({profiles.length})</h2>
@@ -383,6 +461,56 @@ const App = () => {
                     </div>
                   ))
                 )}
+              </div>
+            </div>
+          ) : (
+            <div className="col-span-full flex flex-col gap-4">
+              <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">Match History</h2>
+                <button 
+                  onClick={clearLogs}
+                  className="text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 px-4 py-2 rounded-lg text-sm font-semibold transition-all border border-transparent hover:border-slate-100 dark:hover:border-slate-700 flex items-center gap-2"
+                >
+                  <Trash2 size={16} /> Clear Logs
+                </button>
+              </div>
+              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md border border-slate-200 dark:border-slate-800 overflow-hidden">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 uppercase text-[10px] font-bold tracking-wider">
+                    <tr>
+                      <th className="px-6 py-4">User</th>
+                      <th className="px-6 py-4">Matric</th>
+                      <th className="px-6 py-4">Status</th>
+                      <th className="px-6 py-4">Gap</th>
+                      <th className="px-6 py-4">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {logs.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
+                          No recognition attempts recorded yet
+                        </td>
+                      </tr>
+                    ) : (
+                      logs.map((log) => (
+                        <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                          <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200">{log.name}</td>
+                          <td className="px-6 py-4 text-slate-500 dark:text-slate-400 font-mono">{log.matric_number}</td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${log.success ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'}`}>
+                              {log.success ? 'Success' : 'Failed'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-slate-400 dark:text-slate-500 font-mono">{log.distance !== 'N/A' ? `${(parseFloat(log.distance) * 100).toFixed(1)}%` : '-'}</td>
+                          <td className="px-6 py-4 text-slate-400 dark:text-slate-500">
+                            {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
