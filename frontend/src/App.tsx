@@ -505,6 +505,7 @@ const App = () => {
                               <div>
                                 <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">{p.name}</h4>
                                 <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">{p.matric_number}</p>
+                                <p className="text-[9px] text-slate-400 dark:text-slate-500">ID: {p.id.toString().padStart(4, '0')}</p>
                               </div>
                             </div>
                             <button onClick={() => deleteProfile(p.id)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={18} /></button>
