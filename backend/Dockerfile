@@ -22,8 +22,6 @@ COPY . .
 # Ensure uvicorn is installed
 RUN pip install uvicorn
 
-# Give execution permissions to the start script
-RUN chmod +x start.sh
-
-# Use the script to start the application
-CMD ["/bin/sh", "start.sh"]
+# Start the application using python directly
+# The port logic is now handled inside main.py
+CMD ["python", "main.py"]
