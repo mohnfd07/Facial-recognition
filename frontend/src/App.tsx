@@ -270,8 +270,14 @@ const App = () => {
             </>
           ) : (
             <div className="col-span-full flex flex-col gap-4">
-              <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border">
+              <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                 <h2 className="text-xl font-bold text-slate-800">Registered Profiles ({profiles.length})</h2>
+                <button 
+                  onClick={clearProfiles}
+                  className="text-red-500 hover:bg-red-50 px-4 py-2 rounded-lg text-sm font-semibold transition-all border border-transparent hover:border-red-100 flex items-center gap-2"
+                >
+                  <Trash2 size={16} /> Clear All
+                </button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {profiles.length === 0 ? (

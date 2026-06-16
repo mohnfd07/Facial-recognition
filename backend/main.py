@@ -116,6 +116,12 @@ def delete_profile(user_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": f"User {user_id} deleted"}
 
+@app.delete("/profiles")
+def delete_all_profiles(db: Session = Depends(get_db)):
+    db.query(models.User).delete()
+    db.commit()
+    return {"message": "All profiles deleted"}
+
 if __name__ == "__main__":
     import uvicorn
     # Get port from environment variable (standard for Railway/Render)
