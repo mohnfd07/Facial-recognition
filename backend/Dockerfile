@@ -22,5 +22,8 @@ COPY . .
 # Ensure uvicorn is installed
 RUN pip install uvicorn
 
-# Explicitly use /bin/sh -c to ensure environment variable expansion ($PORT)
-CMD ["/bin/sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Give execution permissions to the start script
+RUN chmod +x start.sh
+
+# Use the script to start the application
+CMD ["/bin/sh", "start.sh"]
