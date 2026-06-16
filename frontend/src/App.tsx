@@ -44,6 +44,20 @@ const App = () => {
     }
   };
 
+  const clearProfiles = async () => {
+    if (!window.confirm('DANGEROUS: Are you sure you want to delete ALL profiles?')) return;
+    setLoading(true);
+    try {
+      await axios.delete(`${API_BASE_URL}/profiles`);
+      setProfiles([]);
+      setResult({ success: true, message: 'All profiles cleared successfully' });
+    } catch (err) {
+      setError('Failed to clear profiles');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const capture = useCallback(async () => {
     if (!webcamRef.current) return;
     const imageSrc = webcamRef.current.getScreenshot();
