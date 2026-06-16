@@ -5,21 +5,19 @@ import {
   Camera as CameraIcon, 
   UserPlus, 
   Search, 
-  Users, 
   RefreshCw, 
   AlertCircle, 
   CheckCircle2, 
   Trash2,
   Sun,
   Moon,
-  History,
   Info,
   Settings,
   X
 } from 'lucide-react';
 
 // Use local backend if running on localhost, otherwise use production Railway URL
-// Force Vercel Redeploy - Build Timestamp: 2026-06-16
+// Force Vercel Redeploy - Build Timestamp: 2026-06-16 14:45
 const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   ? 'http://localhost:8000' 
   : 'https://facial-rec-fm.up.railway.app';
