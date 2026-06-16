@@ -36,12 +36,7 @@ def health_check():
 # Add CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://facial-rec-fm.vercel.app",
-        "https://facial-recognition-eta.vercel.app",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000"
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
