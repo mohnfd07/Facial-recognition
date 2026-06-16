@@ -549,8 +549,8 @@ const App = () => {
                                 </td>
                                 <td className="py-3 text-slate-400 font-mono text-[10px]">{log.distance !== 'N/A' ? `${(parseFloat(log.distance) * 100).toFixed(1)}%` : '-'}</td>
                                 <td className="py-3 text-right text-slate-400 text-[10px]">
-                                  <div className="font-bold">{new Date(log.timestamp).toLocaleDateString()}</div>
-                                  <div>{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                  <div className="font-bold">{new Date(log.timestamp.endsWith('Z') ? log.timestamp : log.timestamp + 'Z').toLocaleDateString()}</div>
+                                  <div>{new Date(log.timestamp.endsWith('Z') ? log.timestamp : log.timestamp + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                                 </td>
                               </tr>
                             ))
