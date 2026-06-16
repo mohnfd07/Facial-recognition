@@ -13,6 +13,7 @@ const App = () => {
   const [mode, setMode] = useState<'register' | 'recognize' | 'profiles'>('recognize');
   const [name, setName] = useState('');
   const [matricNumber, setMatricNumber] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   const [profiles, setProfiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -20,13 +21,24 @@ const App = () => {
   const webcamRef = useRef<Webcam>(null);
 
   const fetchProfiles = async () => {
+    let password = adminPassword;
+    if (!password) {
+      const input = window.prompt('Enter Admin Password:');
+      if (input === null) return;
+      password = input;
+    }
+
     setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/profiles`);
+      const response = await axios.get(`${API_BASE_URL}/profiles`, {
+        headers: { 'X-Admin-Password': password }
+      });
       setProfiles(response.data);
+      setAdminPassword(password);
       setMode('profiles');
-    } catch (err) {
-      setError('Failed to fetch profiles');
+    } catch (err: any) {
+      setError(err.response?.status === 401 ? 'Invalid Admin Password' : 'Failed to fetch profiles');
+      setAdminPassword('');
     } finally {
       setLoading(false);
     }
@@ -36,7 +48,9 @@ const App = () => {
     if (!window.confirm('Are you sure you want to delete this profile?')) return;
     setLoading(true);
     try {
-      await axios.delete(`${API_BASE_URL}/profiles/${id}`);
+      await axios.delete(`${API_BASE_URL}/profiles/${id}`, {
+        headers: { 'X-Admin-Password': adminPassword }
+      });
       setProfiles(profiles.filter(p => p.id !== id));
     } catch (err) {
       setError('Failed to delete profile');
@@ -49,7 +63,9 @@ const App = () => {
     if (!window.confirm('DANGEROUS: Are you sure you want to delete ALL profiles?')) return;
     setLoading(true);
     try {
-      await axios.delete(`${API_BASE_URL}/profiles`);
+      await axios.delete(`${API_BASE_URL}/profiles`, {
+        headers: { 'X-Admin-Password': adminPassword }
+      });
       setProfiles([]);
       setResult({ success: true, message: 'All profiles cleared successfully' });
     } catch (err) {
