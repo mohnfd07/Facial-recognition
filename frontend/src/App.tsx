@@ -13,11 +13,13 @@ import {
   Moon,
   Info,
   Settings,
-  X
+  X,
+  Lock,
+  ArrowRight
 } from 'lucide-react';
 
 // Use local backend if running on localhost, otherwise use production Railway URL
-// Force Vercel Redeploy - Build Timestamp: 2026-06-16 14:45
+// Force Vercel Redeploy - Build Timestamp: 2026-06-16 15:00
 const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   ? 'http://localhost:8000' 
   : 'https://facial-rec-fm.up.railway.app';
@@ -25,6 +27,8 @@ const API_BASE_URL = (window.location.hostname === 'localhost' || window.locatio
 const App = () => {
   const [mode, setMode] = useState<'recognize' | 'register' | 'admin'>('recognize');
   const [adminTab, setAdminTab] = useState<'profiles' | 'history'>('profiles');
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
   const [name, setName] = useState('');
   const [matricNumber, setMatricNumber] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
@@ -50,52 +54,39 @@ const App = () => {
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
   }, [darkMode]);
 
-  const verifyAdminAccess = async () => {
-    let password = adminPassword;
-    if (!password) {
-      const input = window.prompt('Enter Admin Password:');
-      if (input === null) return false;
-      password = input;
-    }
-
+  const handleAdminLogin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
       // Test password by fetching profiles
       await axios.get(`${API_BASE_URL}/profiles`, {
-        headers: { 'X-Admin-Password': password }
+        headers: { 'X-Admin-Password': passwordInput }
       });
-      setAdminPassword(password);
-      return true;
+      setAdminPassword(passwordInput);
+      setIsAdminAuthenticated(true);
+      fetchProfiles(passwordInput);
+      fetchLogs(passwordInput);
     } catch (err: any) {
       setError(err.response?.status === 401 ? 'Invalid Admin Password' : 'Admin authentication failed');
-      setAdminPassword('');
-      return false;
     } finally {
       setLoading(false);
     }
   };
 
-  const openAdmin = async () => {
-    if (adminPassword || await verifyAdminAccess()) {
-      fetchProfiles();
-      fetchLogs();
-      setMode('admin');
-    }
-  };
-
-  const fetchProfiles = async () => {
+  const fetchProfiles = async (pass: string = adminPassword) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/profiles`, {
-        headers: { 'X-Admin-Password': adminPassword }
+        headers: { 'X-Admin-Password': pass }
       });
       setProfiles(response.data);
     } catch (err) {}
   };
 
-  const fetchLogs = async () => {
+  const fetchLogs = async (pass: string = adminPassword) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/logs`, {
-        headers: { 'X-Admin-Password': adminPassword }
+        headers: { 'X-Admin-Password': pass }
       });
       setLogs(response.data);
     } catch (err) {}
@@ -235,6 +226,15 @@ const App = () => {
     }
   }, [mode, name, matricNumber, webcamRef]);
 
+  const toggleAdmin = () => {
+    if (mode === 'admin') {
+      setMode('recognize');
+    } else {
+      setMode('admin');
+      setError(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-50 font-sans p-4 md:p-8 transition-colors duration-300">
       <div className="max-w-4xl mx-auto">
@@ -246,7 +246,7 @@ const App = () => {
             </div>
             <div className="flex items-center gap-2 md:hidden">
               <button 
-                onClick={openAdmin}
+                onClick={toggleAdmin}
                 className={`p-2 rounded-lg border transition-colors ${mode === 'admin' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'}`}
               >
                 <Settings size={20} />
@@ -278,7 +278,7 @@ const App = () => {
             
             <div className="hidden md:flex items-center gap-2">
               <button 
-                onClick={openAdmin}
+                onClick={toggleAdmin}
                 className={`p-2.5 rounded-lg border transition-all ${mode === 'admin' ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200 dark:shadow-none' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                 title="Admin Panel"
               >
@@ -406,6 +406,44 @@ const App = () => {
                 </div>
               </div>
             </>
+          ) : !isAdminAuthenticated ? (
+            <div className="col-span-full flex items-center justify-center py-12">
+              <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md text-center">
+                <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <Lock size={32} />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">Admin Access</h2>
+                <p className="text-slate-500 dark:text-slate-400 mb-8">Enter your administrative password to continue</p>
+                
+                <form onSubmit={handleAdminLogin} className="space-y-4">
+                  <div className="relative">
+                    <input 
+                      type="password"
+                      value={passwordInput}
+                      onChange={(e) => setPasswordInput(e.target.value)}
+                      placeholder="Admin Password"
+                      autoFocus
+                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all pr-12"
+                    />
+                    <button 
+                      type="submit"
+                      disabled={loading}
+                      className="absolute right-2 top-2 bottom-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 rounded-xl flex items-center justify-center transition-colors disabled:bg-indigo-400"
+                    >
+                      {loading ? <RefreshCw size={18} className="animate-spin" /> : <ArrowRight size={18} />}
+                    </button>
+                  </div>
+                  {error && <p className="text-red-500 text-sm font-medium">{error}</p>}
+                </form>
+
+                <button 
+                  onClick={() => setMode('recognize')}
+                  className="mt-8 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold flex items-center justify-center gap-2 mx-auto"
+                >
+                  <X size={16} /> Cancel
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="col-span-full bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
               <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800">
@@ -423,12 +461,20 @@ const App = () => {
                     History
                   </button>
                 </div>
-                <button 
-                  onClick={() => setMode('recognize')}
-                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 transition-colors"
-                >
-                  <X size={20} />
-                </button>
+                <div className="flex items-center gap-2">
+                   <button 
+                    onClick={() => { setIsAdminAuthenticated(false); setAdminPassword(''); setPasswordInput(''); }}
+                    className="p-2 text-xs font-bold text-slate-400 hover:text-red-500 transition-colors mr-2"
+                  >
+                    Logout
+                  </button>
+                  <button 
+                    onClick={() => setMode('recognize')}
+                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
 
               <div className="p-6 min-h-[400px]">
