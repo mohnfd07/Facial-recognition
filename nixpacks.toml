@@ -1,5 +1,0 @@
-[phases.setup]
-nixPkgs = ["python311", "libxcb", "libGL", "glib"]
-
-[phases.build]
-cmds = ["pip install -r backend/requirements.txt"]
