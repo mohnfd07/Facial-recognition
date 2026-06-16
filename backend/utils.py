@@ -10,8 +10,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Force DeepFace to use CPU if needed, but usually it's fine.
-# We'll use VGG-Face as it's balanced for speed and accuracy.
-MODEL_NAME = "VGG-Face"
+# We'll use Facenet as it's highly accurate but much lighter than VGG-Face.
+MODEL_NAME = "Facenet"
 
 logger.info(f"Using DeepFace model: {MODEL_NAME}")
 
