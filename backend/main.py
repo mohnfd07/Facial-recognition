@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
@@ -12,6 +12,14 @@ import logging
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Admin password from environment variable
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
+
+def verify_admin(x_admin_password: str = Header(None)):
+    if x_admin_password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Invalid admin password")
+    return True
 
 # Ensure backend directory is in sys.path
 current_dir = os.path.dirname(os.path.realpath(__file__))
@@ -126,10 +134,6 @@ def delete_all_profiles(db: Session = Depends(get_db), authenticated: bool = Dep
 if __name__ == "__main__":
     import uvicorn
     # Get port from environment variable (standard for Railway/Render)
-    port = int(os.environ.get("PORT", 8000))
-    logger.info(f"Starting server on port {port}")
-    uvicorn.run(app, host="0.0.0.0", port=port)
-le (standard for Railway/Render)
     port = int(os.environ.get("PORT", 8000))
     logger.info(f"Starting server on port {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
