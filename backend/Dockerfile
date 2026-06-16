@@ -22,6 +22,5 @@ COPY . .
 # Ensure uvicorn is installed
 RUN pip install uvicorn
 
-# Use the shell form of CMD to allow environment variable expansion ($PORT)
-# Railway automatically provides the PORT variable.
-CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Explicitly use /bin/sh -c to ensure environment variable expansion ($PORT)
+CMD ["/bin/sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
