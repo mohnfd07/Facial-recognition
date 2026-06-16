@@ -13,7 +13,9 @@ import {
   Sun,
   Moon,
   History,
-  Info
+  Info,
+  Settings,
+  X
 } from 'lucide-react';
 
 // Use local backend if running on localhost, otherwise use production Railway URL
@@ -23,7 +25,8 @@ const API_BASE_URL = (window.location.hostname === 'localhost' || window.locatio
   : 'https://facial-rec-fm.up.railway.app';
 
 const App = () => {
-  const [mode, setMode] = useState<'recognize' | 'register' | 'profiles' | 'history'>('recognize');
+  const [mode, setMode] = useState<'recognize' | 'register' | 'admin'>('recognize');
+  const [adminTab, setAdminTab] = useState<'profiles' | 'history'>('profiles');
   const [name, setName] = useState('');
   const [matricNumber, setMatricNumber] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
@@ -49,52 +52,55 @@ const App = () => {
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
   }, [darkMode]);
 
-  const fetchProfiles = async () => {
+  const verifyAdminAccess = async () => {
     let password = adminPassword;
     if (!password) {
       const input = window.prompt('Enter Admin Password:');
-      if (input === null) return;
+      if (input === null) return false;
       password = input;
     }
 
     setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/profiles`, {
+      // Test password by fetching profiles
+      await axios.get(`${API_BASE_URL}/profiles`, {
         headers: { 'X-Admin-Password': password }
       });
-      setProfiles(response.data);
       setAdminPassword(password);
-      setMode('profiles');
+      return true;
     } catch (err: any) {
-      setError(err.response?.status === 401 ? 'Invalid Admin Password' : 'Failed to fetch profiles');
+      setError(err.response?.status === 401 ? 'Invalid Admin Password' : 'Admin authentication failed');
       setAdminPassword('');
+      return false;
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchLogs = async () => {
-    let password = adminPassword;
-    if (!password) {
-      const input = window.prompt('Enter Admin Password:');
-      if (input === null) return;
-      password = input;
+  const openAdmin = async () => {
+    if (adminPassword || await verifyAdminAccess()) {
+      fetchProfiles();
+      fetchLogs();
+      setMode('admin');
     }
+  };
 
-    setLoading(true);
+  const fetchProfiles = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/profiles`, {
+        headers: { 'X-Admin-Password': adminPassword }
+      });
+      setProfiles(response.data);
+    } catch (err) {}
+  };
+
+  const fetchLogs = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/logs`, {
-        headers: { 'X-Admin-Password': password }
+        headers: { 'X-Admin-Password': adminPassword }
       });
       setLogs(response.data);
-      setAdminPassword(password);
-      setMode('history');
-    } catch (err: any) {
-      setError(err.response?.status === 401 ? 'Invalid Admin Password' : 'Failed to fetch logs');
-      setAdminPassword('');
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) {}
   };
 
   const deleteProfile = async (id: number) => {
@@ -120,7 +126,6 @@ const App = () => {
         headers: { 'X-Admin-Password': adminPassword }
       });
       setProfiles([]);
-      setResult({ success: true, message: 'All profiles cleared successfully' });
     } catch (err) {
       setError('Failed to clear profiles');
     } finally {
@@ -185,12 +190,8 @@ const App = () => {
 
     ctx.drawImage(img, 0, 0);
 
-    // Quality Check before masking
     const tip = checkImageQuality(canvas);
-    if (tip) {
-      setQualityTip(tip);
-      // We still proceed, but warn the user
-    }
+    if (tip) setQualityTip(tip);
 
     const maskWidth = img.width * 0.4;
     const maskHeight = img.height * 0.8;
@@ -245,54 +246,59 @@ const App = () => {
               <h1 className="text-3xl font-bold tracking-tight text-indigo-600 dark:text-indigo-400">FaceAuth</h1>
               <p className="text-slate-500 dark:text-slate-400">Secure Facial Recognition System</p>
             </div>
-            <button 
-              onClick={() => setDarkMode(!darkMode)}
-              className="md:hidden p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
-            >
-              {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-            </button>
+            <div className="flex items-center gap-2 md:hidden">
+              <button 
+                onClick={openAdmin}
+                className={`p-2 rounded-lg border transition-colors ${mode === 'admin' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'}`}
+              >
+                <Settings size={20} />
+              </button>
+              <button 
+                onClick={() => setDarkMode(!darkMode)}
+                className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
+              >
+                {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
+            </div>
           </div>
           
-          <div className="flex items-center gap-4 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+          <div className="flex items-center gap-4 w-full md:w-auto">
             <nav className="flex flex-1 md:flex-none bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800 p-1">
               <button 
                 onClick={() => setMode('recognize')}
-                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3 py-2 rounded-md transition-all text-sm font-medium ${mode === 'recognize' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
+                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-md transition-all text-sm font-medium ${mode === 'recognize' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
               >
-                <Search size={16} /> <span className="hidden sm:inline">Identify</span>
+                <Search size={16} /> Identify
               </button>
               <button 
                 onClick={() => setMode('register')}
-                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3 py-2 rounded-md transition-all text-sm font-medium ${mode === 'register' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
+                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-md transition-all text-sm font-medium ${mode === 'register' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
               >
-                <UserPlus size={16} /> <span className="hidden sm:inline">Register</span>
-              </button>
-              <button 
-                onClick={fetchProfiles}
-                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3 py-2 rounded-md transition-all text-sm font-medium ${mode === 'profiles' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
-              >
-                <Users size={16} /> <span className="hidden sm:inline">Profiles</span>
-              </button>
-              <button 
-                onClick={fetchLogs}
-                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3 py-2 rounded-md transition-all text-sm font-medium ${mode === 'history' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
-              >
-                <History size={16} /> <span className="hidden sm:inline">History</span>
+                <UserPlus size={16} /> Register
               </button>
             </nav>
             
-            <button 
-              onClick={() => setDarkMode(!darkMode)}
-              className="hidden md:flex p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-            >
-              {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-            </button>
+            <div className="hidden md:flex items-center gap-2">
+              <button 
+                onClick={openAdmin}
+                className={`p-2.5 rounded-lg border transition-all ${mode === 'admin' ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200 dark:shadow-none' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                title="Admin Panel"
+              >
+                <Settings size={20} />
+              </button>
+              <button 
+                onClick={() => setDarkMode(!darkMode)}
+                className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                title={darkMode ? "Light Mode" : "Dark Mode"}
+              >
+                {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
+            </div>
           </div>
         </header>
 
         <main className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {mode === 'recognize' || mode === 'register' ? (
+          {mode !== 'admin' ? (
             <>
               <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800">
                 <div className="relative rounded-xl overflow-hidden bg-slate-900 aspect-video mb-6">
@@ -304,7 +310,6 @@ const App = () => {
                     videoConstraints={{ facingMode: "user" }}
                   />
                   
-                  {/* Face Positioning Guide Overlay */}
                   <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                     <div className="w-28 h-40 md:w-36 md:h-52 border-2 border-dashed border-indigo-400/60 rounded-[100%] shadow-[0_0_0_9999px_rgba(15,23,42,0.6)] flex items-center justify-center">
                       <div className="text-indigo-200/40 text-[8px] font-medium uppercase tracking-widest text-center px-4">
@@ -313,7 +318,6 @@ const App = () => {
                     </div>
                   </div>
 
-                  {/* Quality Tip Overlay */}
                   {qualityTip && (
                     <div className="absolute bottom-4 left-4 right-4 bg-amber-500/90 text-white text-xs py-2 px-3 rounded-lg flex items-center gap-2 animate-bounce">
                       <Info size={14} /> {qualityTip}
@@ -370,7 +374,6 @@ const App = () => {
                         <CameraIcon size={32} />
                       </div>
                       <p className="text-lg font-medium">Capture a photo to begin</p>
-                      <p className="text-sm mt-1">Make sure your face is clearly visible</p>
                     </div>
                   )}
 
@@ -379,138 +382,132 @@ const App = () => {
                   {error && (
                     <div className="text-red-500 dark:text-red-400">
                       <AlertCircle size={48} className="mb-4 mx-auto" />
-                      <p className="text-lg font-bold">Detection Error</p>
+                      <p className="text-lg font-bold">Error</p>
                       <p className="text-sm">{error}</p>
                     </div>
                   )}
 
                   {result && (
                     <div className={result.match || result.success ? "text-emerald-600 dark:text-emerald-400" : "text-amber-500 dark:text-amber-400"}>
-                      {result.match || result.success ? (
-                        <CheckCircle2 size={64} className="mb-4 mx-auto" />
-                      ) : (
-                        <AlertCircle size={64} className="mb-4 mx-auto" />
-                      )}
-                      <h2 className="text-2xl font-bold">
-                        {result.success ? "Registration Success" : result.match ? "Match Found" : "No Match Found"}
-                      </h2>
-                      {result.name && (
-                        <p className="text-4xl font-black mt-2 tracking-tight uppercase">{result.name}</p>
-                      )}
-                      {result.matric_number && (
-                        <p className="text-lg text-slate-500 dark:text-slate-400 font-bold mt-1">MATRIC: {result.matric_number}</p>
-                      )}
-                      {result.distance && (
-                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 italic font-mono">
-                          Confidence Gap: {(result.distance * 100).toFixed(1)}%
-                        </p>
-                      )}
+                      {result.match || result.success ? <CheckCircle2 size={64} className="mb-4 mx-auto" /> : <AlertCircle size={64} className="mb-4 mx-auto" />}
+                      <h2 className="text-2xl font-bold">{result.success ? "Success" : result.match ? "Match Found" : "No Match"}</h2>
+                      {result.name && <p className="text-4xl font-black mt-2 tracking-tight uppercase">{result.name}</p>}
+                      {result.matric_number && <p className="text-lg text-slate-500 dark:text-slate-400 font-bold mt-1">MATRIC: {result.matric_number}</p>}
                       {result.message && <p className="text-slate-600 dark:text-slate-400 mt-2">{result.message}</p>}
                     </div>
                   )}
                 </div>
 
-                <div className="bg-indigo-600 dark:bg-indigo-700 p-6 rounded-2xl shadow-xl text-white">
+                <div className="bg-indigo-600 p-6 rounded-2xl shadow-xl text-white">
                   <h3 className="font-bold text-lg mb-2">Tips for better results</h3>
-                  <ul className="text-indigo-100 space-y-2 list-disc list-inside text-sm">
-                    <li>Ensure good lighting on your face</li>
-                    <li>Avoid wearing sunglasses or hats</li>
+                  <ul className="text-indigo-100 space-y-1 list-disc list-inside text-sm">
+                    <li>Good lighting is essential</li>
                     <li>Look directly into the camera</li>
-                    <li>Keep your face centered in the frame</li>
+                    <li>Keep your face centered</li>
                   </ul>
                 </div>
               </div>
             </>
-          ) : mode === 'profiles' ? (
-            <div className="col-span-full flex flex-col gap-4">
-              <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
-                <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">Registered Profiles ({profiles.length})</h2>
+          ) : (
+            <div className="col-span-full bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+              <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-6">
+                  <button 
+                    onClick={() => setAdminTab('profiles')}
+                    className={`pb-2 text-sm font-bold transition-all border-b-2 ${adminTab === 'profiles' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                  >
+                    Profiles ({profiles.length})
+                  </button>
+                  <button 
+                    onClick={() => setAdminTab('history')}
+                    className={`pb-2 text-sm font-bold transition-all border-b-2 ${adminTab === 'history' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                  >
+                    History
+                  </button>
+                </div>
                 <button 
-                  onClick={clearProfiles}
-                  className="text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 px-4 py-2 rounded-lg text-sm font-semibold transition-all border border-transparent hover:border-red-100 dark:hover:border-red-900/30 flex items-center gap-2"
+                  onClick={() => setMode('recognize')}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 transition-colors"
                 >
-                  <Trash2 size={16} /> Clear All
+                  <X size={20} />
                 </button>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {profiles.length === 0 ? (
-                  <div className="col-span-full bg-white dark:bg-slate-900 p-12 rounded-2xl text-center border border-dashed border-slate-300 dark:border-slate-700">
-                    <Users size={48} className="text-slate-300 dark:text-slate-600 mx-auto mb-4" />
-                    <p className="text-slate-500 dark:text-slate-400 font-medium">No registered profiles yet</p>
-                  </div>
-                ) : (
-                  profiles.map((p) => (
-                    <div key={p.id} className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-md border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center font-bold text-xl">
-                          {p.name[0].toUpperCase()}
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-slate-800 dark:text-slate-100">{p.name}</h3>
-                          <p className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold">{p.matric_number}</p>
-                          <p className="text-[10px] text-slate-400 dark:text-slate-500">ID: {p.id.toString().padStart(4, '0')}</p>
-                        </div>
-                      </div>
+
+              <div className="p-6 min-h-[400px]">
+                {adminTab === 'profiles' ? (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Manage Users</h3>
                       <button 
-                        onClick={() => deleteProfile(p.id)}
-                        className="text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-colors p-2"
-                        title="Delete Profile"
+                        onClick={clearProfiles}
+                        className="text-red-500 text-sm font-bold flex items-center gap-2 px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-all"
                       >
-                        <Trash2 size={20} />
+                        <Trash2 size={16} /> Delete All
                       </button>
                     </div>
-                  ))
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {profiles.length === 0 ? (
+                        <div className="col-span-full py-12 text-center text-slate-400">No profiles registered</div>
+                      ) : (
+                        profiles.map((p) => (
+                          <div key={p.id} className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center font-bold">{p.name[0]}</div>
+                              <div>
+                                <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">{p.name}</h4>
+                                <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">{p.matric_number}</p>
+                              </div>
+                            </div>
+                            <button onClick={() => deleteProfile(p.id)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={18} /></button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Match Logs</h3>
+                      <button 
+                        onClick={clearLogs}
+                        className="text-slate-400 text-sm font-bold flex items-center gap-2 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all"
+                      >
+                        <Trash2 size={16} /> Clear Logs
+                      </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead className="text-slate-400 uppercase text-[10px] font-bold tracking-wider">
+                          <tr>
+                            <th className="pb-4">User</th>
+                            <th className="pb-4">Status</th>
+                            <th className="pb-4">Gap</th>
+                            <th className="pb-4 text-right">Time</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                          {logs.length === 0 ? (
+                            <tr><td colSpan={4} className="py-12 text-center text-slate-400">No history available</td></tr>
+                          ) : (
+                            logs.map((log) => (
+                              <tr key={log.id}>
+                                <td className="py-3">
+                                  <div className="font-bold text-slate-700 dark:text-slate-200">{log.name}</div>
+                                  <div className="text-[10px] text-slate-400">{log.matric_number}</div>
+                                </td>
+                                <td className="py-3">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${log.success ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30'}`}>{log.success ? 'OK' : 'FAIL'}</span>
+                                </td>
+                                <td className="py-3 text-slate-400 font-mono text-[10px]">{log.distance !== 'N/A' ? `${(parseFloat(log.distance) * 100).toFixed(1)}%` : '-'}</td>
+                                <td className="py-3 text-right text-slate-400 text-[10px]">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 )}
-              </div>
-            </div>
-          ) : (
-            <div className="col-span-full flex flex-col gap-4">
-              <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
-                <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">Match History</h2>
-                <button 
-                  onClick={clearLogs}
-                  className="text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 px-4 py-2 rounded-lg text-sm font-semibold transition-all border border-transparent hover:border-slate-100 dark:hover:border-slate-700 flex items-center gap-2"
-                >
-                  <Trash2 size={16} /> Clear Logs
-                </button>
-              </div>
-              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md border border-slate-200 dark:border-slate-800 overflow-hidden">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 uppercase text-[10px] font-bold tracking-wider">
-                    <tr>
-                      <th className="px-6 py-4">User</th>
-                      <th className="px-6 py-4">Matric</th>
-                      <th className="px-6 py-4">Status</th>
-                      <th className="px-6 py-4">Gap</th>
-                      <th className="px-6 py-4">Time</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {logs.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
-                          No recognition attempts recorded yet
-                        </td>
-                      </tr>
-                    ) : (
-                      logs.map((log) => (
-                        <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
-                          <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200">{log.name}</td>
-                          <td className="px-6 py-4 text-slate-500 dark:text-slate-400 font-mono">{log.matric_number}</td>
-                          <td className="px-6 py-4">
-                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${log.success ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'}`}>
-                              {log.success ? 'Success' : 'Failed'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-slate-400 dark:text-slate-500 font-mono">{log.distance !== 'N/A' ? `${(parseFloat(log.distance) * 100).toFixed(1)}%` : '-'}</td>
-                          <td className="px-6 py-4 text-slate-400 dark:text-slate-500">
-                            {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
               </div>
             </div>
           )}
