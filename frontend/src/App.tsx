@@ -75,21 +75,29 @@ const App = () => {
   };
 
   const fetchProfiles = async (pass: string = adminPassword) => {
+    setLoading(true);
     try {
       const response = await axios.get(`${API_BASE_URL}/profiles`, {
         headers: { 'X-Admin-Password': pass }
       });
       setProfiles(response.data);
-    } catch (err) {}
+    } catch (err) {
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fetchLogs = async (pass: string = adminPassword) => {
+    setLoading(true);
     try {
       const response = await axios.get(`${API_BASE_URL}/logs`, {
         headers: { 'X-Admin-Password': pass }
       });
       setLogs(response.data);
-    } catch (err) {}
+    } catch (err) {
+    } finally {
+      setLoading(false);
+    }
   };
 
   const deleteProfile = async (id: number) => {
@@ -487,12 +495,21 @@ const App = () => {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Manage Users</h3>
-                      <button 
-                        onClick={clearProfiles}
-                        className="text-red-500 text-sm font-bold flex items-center gap-2 px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-all"
-                      >
-                        <Trash2 size={16} /> Delete All
-                      </button>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => fetchProfiles()}
+                          disabled={loading}
+                          className="text-indigo-600 dark:text-indigo-400 text-sm font-bold flex items-center gap-2 px-3 py-1.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all"
+                        >
+                          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh
+                        </button>
+                        <button 
+                          onClick={clearProfiles}
+                          className="text-red-500 text-sm font-bold flex items-center gap-2 px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-all"
+                        >
+                          <Trash2 size={16} /> Delete All
+                        </button>
+                      </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {profiles.length === 0 ? (
@@ -518,12 +535,21 @@ const App = () => {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Match Logs</h3>
-                      <button 
-                        onClick={clearLogs}
-                        className="text-slate-400 text-sm font-bold flex items-center gap-2 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all"
-                      >
-                        <Trash2 size={16} /> Clear Logs
-                      </button>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => fetchLogs()}
+                          disabled={loading}
+                          className="text-indigo-600 dark:text-indigo-400 text-sm font-bold flex items-center gap-2 px-3 py-1.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all"
+                        >
+                          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh
+                        </button>
+                        <button 
+                          onClick={clearLogs}
+                          className="text-slate-400 text-sm font-bold flex items-center gap-2 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all"
+                        >
+                          <Trash2 size={16} /> Clear Logs
+                        </button>
+                      </div>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-sm">
