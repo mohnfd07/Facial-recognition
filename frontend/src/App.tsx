@@ -69,6 +69,15 @@ const App = () => {
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
   }, [darkMode]);
 
+  // Safety net: Clear admin credentials if mode is switched away from admin
+  useEffect(() => {
+    if (mode !== 'admin' && isAdminAuthenticated) {
+      setIsAdminAuthenticated(false);
+      setAdminPassword('');
+      setPasswordInput('');
+    }
+  }, [mode, isAdminAuthenticated]);
+
   const handleAdminLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setLoading(true);
@@ -300,13 +309,20 @@ const App = () => {
           
           <div className="flex items-center gap-4 w-full md:w-auto">
             <nav className="flex flex-1 md:flex-none bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800 p-1">
-              <button onClick={() => setMode('recognize')} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-md transition-all text-sm font-medium ${mode === 'recognize' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
+              <button 
+                onClick={() => { if (mode === 'admin') logoutAdmin(); setMode('recognize'); }}
+                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-md transition-all text-sm font-medium ${mode === 'recognize' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
+              >
                 <Search size={16} /> Identify
               </button>
-              <button onClick={() => setMode('register')} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-md transition-all text-sm font-medium ${mode === 'register' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
+              <button 
+                onClick={() => { if (mode === 'admin') logoutAdmin(); setMode('register'); }}
+                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-md transition-all text-sm font-medium ${mode === 'register' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
+              >
                 <UserPlus size={16} /> Register
               </button>
             </nav>
+
             
             <div className="hidden md:flex items-center gap-2">
               <button onClick={toggleAdmin} className={`p-2.5 rounded-lg border transition-all ${mode === 'admin' ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200 dark:shadow-none' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`} title="Admin Panel">
