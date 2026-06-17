@@ -263,9 +263,20 @@ const App = () => {
     }
   }, [mode, name, matricNumber, webcamRef]);
 
+  const logoutAdmin = () => {
+    setIsAdminAuthenticated(false);
+    setAdminPassword('');
+    setPasswordInput('');
+    setMode('recognize');
+  };
+
   const toggleAdmin = () => {
-    if (mode === 'admin') setMode('recognize');
-    else { setMode('admin'); setError(null); }
+    if (mode === 'admin') {
+      logoutAdmin();
+    } else {
+      setMode('admin');
+      setError(null);
+    }
   };
 
   return (
@@ -413,8 +424,9 @@ const App = () => {
                   <button onClick={() => setAdminTab('history')} className={`pb-2 text-sm font-bold transition-all border-b-2 ${adminTab === 'history' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>History</button>
                 </div>
                 <div className="flex items-center gap-2">
-                   <button onClick={() => { setIsAdminAuthenticated(false); setAdminPassword(''); setPasswordInput(''); }} className="p-2 text-xs font-bold text-slate-400 hover:text-red-500 transition-colors mr-2">Logout</button>
-                   <button onClick={() => setMode('recognize')} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 transition-colors"><X size={20} /></button>
+                   <button onClick={logoutAdmin} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 transition-colors">
+                    <X size={20} />
+                  </button>
                 </div>
               </div>
 
