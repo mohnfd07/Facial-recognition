@@ -71,6 +71,17 @@ async def register_user(name: str = Form(...), matric_number: str = Form(...), f
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    
+    # Log the registration
+    reg_log = models.RecognitionLog(
+        name=name,
+        matric_number=matric_number,
+        distance="NEW REG",
+        success=True
+    )
+    db.add(reg_log)
+    db.commit()
+
     logger.info(f"User {name} registered successfully")
     return new_user
 
