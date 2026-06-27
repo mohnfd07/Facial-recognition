@@ -398,20 +398,43 @@ const App = () => {
                 {mode === 'recognize' && (
                   <div className="mb-4">
                     {activeSession ? (
-                      <div className="flex items-center justify-between bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-xl px-4 py-3">
-                        <span className="text-sm font-bold text-indigo-700 dark:text-indigo-300">Session: {activeSession.name}</span>
-                        <button onClick={endSession} className="text-xs font-bold text-red-500 hover:text-red-700 dark:hover:text-red-400 px-3 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors">End Session</button>
+                      <div className="flex items-center justify-between bg-gradient-to-r from-emerald-500/10 via-emerald-400/10 to-teal-500/10 dark:from-emerald-500/20 dark:via-emerald-400/20 dark:to-teal-500/20 border border-emerald-300 dark:border-emerald-700 rounded-xl px-5 py-4 shadow-md">
+                        <div className="flex items-center gap-3">
+                          <span className="relative flex h-3 w-3">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                          </span>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Live Session</p>
+                            <p className="text-sm font-bold text-emerald-800 dark:text-emerald-200">{activeSession.name}</p>
+                          </div>
+                        </div>
+                        <button onClick={endSession} className="text-xs font-bold text-red-500 hover:text-white bg-red-50 hover:bg-red-500 dark:bg-red-900/30 dark:hover:bg-red-600 px-4 py-2 rounded-lg transition-all duration-200 border border-red-200 dark:border-red-800">End Session</button>
                       </div>
                     ) : (
                       <div>
                         {showSessionInput ? (
-                          <div className="flex items-center gap-2">
-                            <input type="text" value={sessionNameInput} onChange={(e) => setSessionNameInput(e.target.value)} placeholder="Session name" className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
-                            <button onClick={startSession} disabled={loading} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg transition-colors disabled:bg-indigo-400">Create</button>
-                            <button onClick={() => setShowSessionInput(false)} className="px-3 py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold">Cancel</button>
+                          <div className="bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 dark:from-indigo-500/20 dark:via-purple-500/20 dark:to-pink-500/20 border border-indigo-200 dark:border-indigo-700 rounded-xl p-4 shadow-md">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-indigo-500 dark:text-indigo-400 mb-3">Name your session</p>
+                            <div className="flex items-center gap-2">
+                              <input type="text" value={sessionNameInput} onChange={(e) => setSessionNameInput(e.target.value)} placeholder="e.g. Morning Lecture" className="flex-1 px-4 py-2.5 rounded-lg border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-indigo-500 outline-none placeholder-slate-400" />
+                              <button onClick={startSession} disabled={loading} className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-sm font-bold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50">Create</button>
+                              <button onClick={() => setShowSessionInput(false)} className="px-3 py-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold">✕</button>
+                            </div>
                           </div>
                         ) : (
-                          <button onClick={() => setShowSessionInput(true)} className="text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 px-4 py-2 rounded-lg transition-colors">Start Session</button>
+                          <button onClick={() => setShowSessionInput(true)} className="w-full group animate-subtle-pulse bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 rounded-xl p-[2px] transition-all duration-300 hover:scale-[1.02]">
+                            <div className="bg-white dark:bg-slate-900 rounded-[10px] px-5 py-4 flex items-center gap-4">
+                              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-lg shadow-lg">
+                                ▶
+                              </div>
+                              <div className="text-left">
+                                <p className="text-sm font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Start a Session</p>
+                                <p className="text-xs text-slate-400 dark:text-slate-500">Group attendance scans under one session for easy review</p>
+                              </div>
+                              <div className="ml-auto text-indigo-400 group-hover:translate-x-1 transition-transform duration-200 text-lg">→</div>
+                            </div>
+                          </button>
                         )}
                       </div>
                     )}
