@@ -27,7 +27,7 @@ const API_BASE_URL = (window.location.hostname === 'localhost' || window.locatio
 
 const App = () => {
   const [mode, setMode] = useState<'recognize' | 'register' | 'admin'>('recognize');
-  const [adminTab, setAdminTab] = useState<'profiles' | 'history'>('profiles');
+  const [adminTab, setAdminTab] = useState<'profiles' | 'history' | 'sessions'>('profiles');
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [name, setName] = useState('');
@@ -39,6 +39,12 @@ const App = () => {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [qualityTip, setQualityTip] = useState<string | null>(null);
+  const [activeSession, setActiveSession] = useState<{id: number; name: string} | null>(null);
+  const [sessionNameInput, setSessionNameInput] = useState('');
+  const [showSessionInput, setShowSessionInput] = useState(false);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [selectedSession, setSelectedSession] = useState<any>(null);
+  const [sessionLogs, setSessionLogs] = useState<any[]>([]);
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('darkMode');
     return saved ? JSON.parse(saved) : window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -118,6 +124,53 @@ const App = () => {
       });
       setLogs(response.data);
     } catch (err) {
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startSession = async () => {
+    if (!sessionNameInput.trim()) return;
+    setLoading(true);
+    try {
+      const response = await axios.post(`${API_BASE_URL}/sessions`, { name: sessionNameInput });
+      setActiveSession({ id: response.data.id, name: response.data.name });
+      setSessionNameInput('');
+      setShowSessionInput(false);
+    } catch (err) {
+      setError('Failed to start session');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const endSession = () => {
+    setActiveSession(null);
+  };
+
+  const fetchSessions = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API_BASE_URL}/sessions`, {
+        headers: { 'X-Admin-Password': adminPassword }
+      });
+      setSessions(response.data);
+    } catch (err) {
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const viewSession = async (session: any) => {
+    setSelectedSession(session);
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API_BASE_URL}/sessions/${session.id}/logs`, {
+        headers: { 'X-Admin-Password': adminPassword }
+      });
+      setSessionLogs(response.data);
+    } catch (err) {
+      setError('Failed to load session logs');
     } finally {
       setLoading(false);
     }
@@ -262,6 +315,9 @@ const App = () => {
         setName('');
         setMatricNumber('');
       } else {
+        if (activeSession) {
+          formData.append('session_id', activeSession.id.toString());
+        }
         const response = await axios.post(`${API_BASE_URL}/recognize`, formData);
         setResult(response.data);
       }
@@ -270,7 +326,7 @@ const App = () => {
     } finally {
       setLoading(false);
     }
-  }, [mode, name, matricNumber, webcamRef]);
+  }, [mode, name, matricNumber, webcamRef, activeSession]);
 
   const logoutAdmin = () => {
     setIsAdminAuthenticated(false);
@@ -339,6 +395,28 @@ const App = () => {
           {mode !== 'admin' ? (
             <>
               <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800">
+                {mode === 'recognize' && (
+                  <div className="mb-4">
+                    {activeSession ? (
+                      <div className="flex items-center justify-between bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-xl px-4 py-3">
+                        <span className="text-sm font-bold text-indigo-700 dark:text-indigo-300">Session: {activeSession.name}</span>
+                        <button onClick={endSession} className="text-xs font-bold text-red-500 hover:text-red-700 dark:hover:text-red-400 px-3 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors">End Session</button>
+                      </div>
+                    ) : (
+                      <div>
+                        {showSessionInput ? (
+                          <div className="flex items-center gap-2">
+                            <input type="text" value={sessionNameInput} onChange={(e) => setSessionNameInput(e.target.value)} placeholder="Session name" className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                            <button onClick={startSession} disabled={loading} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg transition-colors disabled:bg-indigo-400">Create</button>
+                            <button onClick={() => setShowSessionInput(false)} className="px-3 py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold">Cancel</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setShowSessionInput(true)} className="text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 px-4 py-2 rounded-lg transition-colors">Start Session</button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="relative rounded-xl overflow-hidden bg-slate-900 aspect-video mb-6">
                   <Webcam audio={false} ref={webcamRef} screenshotFormat="image/jpeg" className="w-full h-full object-cover" videoConstraints={{ facingMode: "user" }} />
                   <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
@@ -438,6 +516,7 @@ const App = () => {
                 <div className="flex items-center gap-6">
                   <button onClick={() => setAdminTab('profiles')} className={`pb-2 text-sm font-bold transition-all border-b-2 ${adminTab === 'profiles' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Profiles ({profiles.length})</button>
                   <button onClick={() => setAdminTab('history')} className={`pb-2 text-sm font-bold transition-all border-b-2 ${adminTab === 'history' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>History</button>
+                  <button onClick={() => { setAdminTab('sessions'); setSelectedSession(null); fetchSessions(); }} className={`pb-2 text-sm font-bold transition-all border-b-2 ${adminTab === 'sessions' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Sessions</button>
                 </div>
                 <div className="flex items-center gap-2">
                    <button onClick={logoutAdmin} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 transition-colors">
@@ -480,7 +559,7 @@ const App = () => {
                       )}
                     </div>
                   </div>
-                ) : (
+                ) : adminTab === 'history' ? (
                   <div className="space-y-4">
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Match Logs</h3>
@@ -520,6 +599,65 @@ const App = () => {
                         </tbody>
                       </table>
                     </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {selectedSession ? (
+                      <div>
+                        <div className="flex items-center gap-4 mb-4">
+                          <button onClick={() => setSelectedSession(null)} className="text-indigo-600 dark:text-indigo-400 text-sm font-bold flex items-center gap-2 px-3 py-1.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all">&larr; Back</button>
+                          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{selectedSession.name}</h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-sm">
+                            <thead className="text-slate-400 uppercase text-[10px] font-bold tracking-wider">
+                              <tr><th className="pb-4">User</th><th className="pb-4">Status</th><th className="pb-4">Gap</th><th className="pb-4 text-right">Time</th></tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                              {sessionLogs.length === 0 ? (
+                                <tr><td colSpan={4} className="py-12 text-center text-slate-400">No logs for this session</td></tr>
+                              ) : (
+                                sessionLogs.map((log) => (
+                                  <tr key={log.id}>
+                                    <td className="py-3">
+                                      <div className="font-bold text-slate-700 dark:text-slate-200">{log.name}</div>
+                                      <div className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">{log.matric_number}</div>
+                                    </td>
+                                    <td className="py-3"><span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${log.success ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30'}`}>{log.success ? 'OK' : 'FAIL'}</span></td>
+                                    <td className="py-3 text-slate-400 font-mono text-[10px]">{log.distance !== 'N/A' ? `${(parseFloat(log.distance) * 100).toFixed(1)}%` : '-'}</td>
+                                    <td className="py-3 text-right text-slate-400 text-[10px]">
+                                      <div className="font-bold">{new Date(log.timestamp.endsWith('Z') ? log.timestamp : log.timestamp + 'Z').toLocaleDateString()}</div>
+                                      <div>{new Date(log.timestamp.endsWith('Z') ? log.timestamp : log.timestamp + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Sessions</h3>
+                          <button onClick={fetchSessions} disabled={loading} className="text-indigo-600 dark:text-indigo-400 text-sm font-bold flex items-center gap-2 px-3 py-1.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all">
+                            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh
+                          </button>
+                        </div>
+                        {sessions.length === 0 ? (
+                          <div className="py-12 text-center text-slate-400">No sessions found</div>
+                        ) : (
+                          <div className="space-y-2">
+                            {sessions.map((s) => (
+                              <button key={s.id} onClick={() => viewSession(s)} className="w-full text-left p-4 rounded-xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                <div className="font-bold text-sm text-slate-800 dark:text-slate-200">{s.name}</div>
+                                <div className="text-[10px] text-slate-400">{new Date(s.created_at.endsWith('Z') ? s.created_at : s.created_at + 'Z').toLocaleString()}</div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

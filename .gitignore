@@ -32,3 +32,7 @@ frontend/build/
 .vscode/
 .idea/
 .DS_Store
+
+# Logs
+*.log
+

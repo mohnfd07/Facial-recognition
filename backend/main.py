@@ -2,16 +2,21 @@ from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException, Hea
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
-from typing import List
+from typing import List, Optional
 import json
 import numpy as np
 import os
 import sys
 import logging
 
+from dotenv import load_dotenv, find_dotenv
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Load env variables
+load_dotenv(find_dotenv())
 
 # Admin password from environment variable
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
@@ -86,16 +91,18 @@ async def register_user(name: str = Form(...), matric_number: str = Form(...), f
     return new_user
 
 @app.post("/recognize")
-async def recognize_user(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def recognize_user(file: UploadFile = File(...), session_id: Optional[str] = Form(None), db: Session = Depends(get_db)):
     logger.info("Received recognition request")
     contents = await file.read()
     # Run heavy CPU task in a thread pool
     encoding = await run_in_threadpool(utils.get_face_encoding, contents)
     
+    parsed_session_id = int(session_id) if session_id else None
+
     if encoding is None:
         logger.warning("No face detected in recognition attempt")
         # Save a fail log
-        fail_log = models.RecognitionLog(success=False)
+        fail_log = models.RecognitionLog(success=False, session_id=None)
         db.add(fail_log)
         db.commit()
         raise HTTPException(status_code=400, detail="No face detected in the image")
@@ -125,7 +132,8 @@ async def recognize_user(file: UploadFile = File(...), db: Session = Depends(get
         name=best_match["name"] if best_match else "Unknown",
         matric_number=best_match["matric_number"] if best_match else "N/A",
         distance=str(round(float(min_distance), 4)) if best_match else "N/A",
-        success=True if best_match else False
+        success=True if best_match else False,
+        session_id=parsed_session_id if best_match else None
     )
     db.add(log_entry)
     db.commit()
@@ -165,6 +173,25 @@ def delete_all_logs(db: Session = Depends(get_db), authenticated: bool = Depends
     db.query(models.RecognitionLog).delete()
     db.commit()
     return {"message": "All logs cleared"}
+
+@app.post("/sessions", response_model=schemas.Session)
+def create_session(session: schemas.SessionCreate, db: Session = Depends(get_db)):
+    new_session = models.Session(name=session.name)
+    db.add(new_session)
+    db.commit()
+    db.refresh(new_session)
+    return new_session
+
+@app.get("/sessions", response_model=List[schemas.Session])
+def get_sessions(db: Session = Depends(get_db), authenticated: bool = Depends(verify_admin)):
+    return db.query(models.Session).order_by(models.Session.created_at.desc()).all()
+
+@app.get("/sessions/{session_id}/logs", response_model=List[schemas.RecognitionLog])
+def get_session_logs(session_id: int, db: Session = Depends(get_db), authenticated: bool = Depends(verify_admin)):
+    return db.query(models.RecognitionLog).filter(
+        models.RecognitionLog.session_id == session_id,
+        models.RecognitionLog.success == True
+    ).order_by(models.RecognitionLog.timestamp.desc()).all()
 
 if __name__ == "__main__":
     import uvicorn
