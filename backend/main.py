@@ -9,14 +9,11 @@ import os
 import sys
 import logging
 
-from dotenv import load_dotenv, find_dotenv
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Load env variables
-load_dotenv(find_dotenv())
 
 # Admin password from environment variable
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
@@ -102,7 +99,7 @@ async def recognize_user(file: UploadFile = File(...), session_id: Optional[str]
     if encoding is None:
         logger.warning("No face detected in recognition attempt")
         # Save a fail log
-        fail_log = models.RecognitionLog(success=False, session_id=None)
+        fail_log = models.RecognitionLog(success=False, session_id=parsed_session_id)
         db.add(fail_log)
         db.commit()
         raise HTTPException(status_code=400, detail="No face detected in the image")
@@ -133,7 +130,7 @@ async def recognize_user(file: UploadFile = File(...), session_id: Optional[str]
         matric_number=best_match["matric_number"] if best_match else "N/A",
         distance=str(round(float(min_distance), 4)) if best_match else "N/A",
         success=True if best_match else False,
-        session_id=parsed_session_id if best_match else None
+        session_id=parsed_session_id
     )
     db.add(log_entry)
     db.commit()
@@ -189,8 +186,7 @@ def get_sessions(db: Session = Depends(get_db), authenticated: bool = Depends(ve
 @app.get("/sessions/{session_id}/logs", response_model=List[schemas.RecognitionLog])
 def get_session_logs(session_id: int, db: Session = Depends(get_db), authenticated: bool = Depends(verify_admin)):
     return db.query(models.RecognitionLog).filter(
-        models.RecognitionLog.session_id == session_id,
-        models.RecognitionLog.success == True
+        models.RecognitionLog.session_id == session_id
     ).order_by(models.RecognitionLog.timestamp.desc()).all()
 
 if __name__ == "__main__":
