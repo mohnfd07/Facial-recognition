@@ -28,11 +28,14 @@ const API_BASE_URL = (window.location.hostname === 'localhost' || window.locatio
 const App = () => {
   const [mode, setMode] = useState<'recognize' | 'register' | 'admin'>('recognize');
   const [adminTab, setAdminTab] = useState<'profiles' | 'history' | 'sessions'>('profiles');
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const [passwordInput, setPasswordInput] = useState('');
+  const [lecturerAuth, setLecturerAuth] = useState<{token: string; username: string; role: string} | null>(() => {
+    const saved = localStorage.getItem('lecturerAuth');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [name, setName] = useState('');
   const [matricNumber, setMatricNumber] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
   const [profiles, setProfiles] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -75,69 +78,105 @@ const App = () => {
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
   }, [darkMode]);
 
-  // Safety net: Clear admin credentials if mode is switched away from admin
   useEffect(() => {
-    if (mode !== 'admin' && isAdminAuthenticated) {
-      setIsAdminAuthenticated(false);
-      setAdminPassword('');
-      setPasswordInput('');
+    if (lecturerAuth) {
+      localStorage.setItem('lecturerAuth', JSON.stringify(lecturerAuth));
+    } else {
+      localStorage.removeItem('lecturerAuth');
     }
-  }, [mode, isAdminAuthenticated]);
+  }, [lecturerAuth]);
 
-  const handleAdminLogin = async (e?: React.FormEvent) => {
+  useEffect(() => {
+    if (lecturerAuth && lecturerAuth.role !== 'super_admin' && adminTab !== 'sessions') {
+      setAdminTab('sessions');
+    }
+  }, [lecturerAuth]);
+
+  useEffect(() => {
+    if (lecturerAuth && mode === 'admin') {
+      if (lecturerAuth.role === 'super_admin') {
+        fetchProfiles();
+        fetchLogs();
+      }
+      fetchSessions();
+    }
+  }, [lecturerAuth, mode]);
+
+  const handleLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setLoading(true);
     setError(null);
     try {
-      await axios.get(`${API_BASE_URL}/profiles`, {
-        headers: { 'X-Admin-Password': passwordInput }
+      const response = await axios.post(`${API_BASE_URL}/auth/login`, {
+        username: loginUsername,
+        password: loginPassword
       });
-      setAdminPassword(passwordInput);
-      setIsAdminAuthenticated(true);
-      fetchProfiles(passwordInput);
-      fetchLogs(passwordInput);
+      setLecturerAuth({
+        token: response.data.access_token,
+        username: response.data.username,
+        role: response.data.role
+      });
+      setLoginUsername('');
+      setLoginPassword('');
     } catch (err: any) {
-      setError(err.response?.status === 401 ? 'Invalid Admin Password' : 'Admin authentication failed');
+      setError(err.response?.status === 401 ? 'Invalid username or password' : 'Login failed');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchProfiles = async (pass: string = adminPassword) => {
+  const fetchProfiles = async () => {
     setLoading(true);
     try {
       const response = await axios.get(`${API_BASE_URL}/profiles`, {
-        headers: { 'X-Admin-Password': pass }
+        headers: { Authorization: `Bearer ${lecturerAuth?.token}` }
       });
       setProfiles(response.data);
-    } catch (err) {
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        setLecturerAuth(null);
+        setMode('recognize');
+        return;
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchLogs = async (pass: string = adminPassword) => {
+  const fetchLogs = async () => {
     setLoading(true);
     try {
       const response = await axios.get(`${API_BASE_URL}/logs`, {
-        headers: { 'X-Admin-Password': pass }
+        headers: { Authorization: `Bearer ${lecturerAuth?.token}` }
       });
       setLogs(response.data);
-    } catch (err) {
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        setLecturerAuth(null);
+        setMode('recognize');
+        return;
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const startSession = async () => {
-    if (!sessionNameInput.trim()) return;
+    if (!sessionNameInput.trim() || !lecturerAuth) return;
     setLoading(true);
     try {
-      const response = await axios.post(`${API_BASE_URL}/sessions`, { name: sessionNameInput });
+      const response = await axios.post(`${API_BASE_URL}/sessions`, { name: sessionNameInput }, {
+        headers: { Authorization: `Bearer ${lecturerAuth.token}` }
+      });
       setActiveSession({ id: response.data.id, name: response.data.name });
       setSessionNameInput('');
       setShowSessionInput(false);
-    } catch (err) {
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        setLecturerAuth(null);
+        setMode('recognize');
+        return;
+      }
       setError('Failed to start session');
     } finally {
       setLoading(false);
@@ -152,10 +191,15 @@ const App = () => {
     setLoading(true);
     try {
       const response = await axios.get(`${API_BASE_URL}/sessions`, {
-        headers: { 'X-Admin-Password': adminPassword }
+        headers: { Authorization: `Bearer ${lecturerAuth?.token}` }
       });
       setSessions(response.data);
-    } catch (err) {
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        setLecturerAuth(null);
+        setMode('recognize');
+        return;
+      }
     } finally {
       setLoading(false);
     }
@@ -166,10 +210,15 @@ const App = () => {
     setLoading(true);
     try {
       const response = await axios.get(`${API_BASE_URL}/sessions/${session.id}/logs`, {
-        headers: { 'X-Admin-Password': adminPassword }
+        headers: { Authorization: `Bearer ${lecturerAuth?.token}` }
       });
       setSessionLogs(response.data);
-    } catch (err) {
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        setLecturerAuth(null);
+        setMode('recognize');
+        return;
+      }
       setError('Failed to load session logs');
     } finally {
       setLoading(false);
@@ -186,10 +235,15 @@ const App = () => {
         setLoading(true);
         try {
           await axios.delete(`${API_BASE_URL}/profiles/${id}`, {
-            headers: { 'X-Admin-Password': adminPassword }
+            headers: { Authorization: `Bearer ${lecturerAuth?.token}` }
           });
           setProfiles(profiles.filter(p => p.id !== id));
-        } catch (err) {
+        } catch (err: any) {
+          if (err.response?.status === 401) {
+            setLecturerAuth(null);
+            setMode('recognize');
+            return;
+          }
           setError('Failed to delete profile');
         } finally {
           setLoading(false);
@@ -209,10 +263,15 @@ const App = () => {
         setLoading(true);
         try {
           await axios.delete(`${API_BASE_URL}/profiles`, {
-            headers: { 'X-Admin-Password': adminPassword }
+            headers: { Authorization: `Bearer ${lecturerAuth?.token}` }
           });
           setProfiles([]);
-        } catch (err) {
+        } catch (err: any) {
+          if (err.response?.status === 401) {
+            setLecturerAuth(null);
+            setMode('recognize');
+            return;
+          }
           setError('Failed to clear profiles');
         } finally {
           setLoading(false);
@@ -232,10 +291,15 @@ const App = () => {
         setLoading(true);
         try {
           await axios.delete(`${API_BASE_URL}/logs`, {
-            headers: { 'X-Admin-Password': adminPassword }
+            headers: { Authorization: `Bearer ${lecturerAuth?.token}` }
           });
           setLogs([]);
-        } catch (err) {
+        } catch (err: any) {
+          if (err.response?.status === 401) {
+            setLecturerAuth(null);
+            setMode('recognize');
+            return;
+          }
           setError('Failed to clear logs');
         } finally {
           setLoading(false);
@@ -328,16 +392,14 @@ const App = () => {
     }
   }, [mode, name, matricNumber, webcamRef, activeSession]);
 
-  const logoutAdmin = () => {
-    setIsAdminAuthenticated(false);
-    setAdminPassword('');
-    setPasswordInput('');
+  const logout = () => {
+    setLecturerAuth(null);
     setMode('recognize');
   };
 
   const toggleAdmin = () => {
     if (mode === 'admin') {
-      logoutAdmin();
+      logout();
     } else {
       setMode('admin');
       setError(null);
@@ -366,13 +428,13 @@ const App = () => {
           <div className="flex items-center gap-4 w-full md:w-auto">
             <nav className="flex flex-1 md:flex-none bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800 p-1">
               <button 
-                onClick={() => { if (mode === 'admin') logoutAdmin(); setMode('recognize'); }}
+                onClick={() => { if (mode === 'admin') logout(); setMode('recognize'); }}
                 className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-md transition-all text-sm font-medium ${mode === 'recognize' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
               >
                 <Search size={16} /> Identify
               </button>
               <button 
-                onClick={() => { if (mode === 'admin') logoutAdmin(); setMode('register'); }}
+                onClick={() => { if (mode === 'admin') logout(); setMode('register'); }}
                 className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-md transition-all text-sm font-medium ${mode === 'register' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
               >
                 <UserPlus size={16} /> Register
@@ -398,43 +460,24 @@ const App = () => {
                 {mode === 'recognize' && (
                   <div className="mb-4">
                     {activeSession ? (
-                      <div className="flex items-center justify-between bg-gradient-to-r from-emerald-500/10 via-emerald-400/10 to-teal-500/10 dark:from-emerald-500/20 dark:via-emerald-400/20 dark:to-teal-500/20 border border-emerald-300 dark:border-emerald-700 rounded-xl px-5 py-4 shadow-md">
-                        <div className="flex items-center gap-3">
-                          <span className="relative flex h-3 w-3">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                          </span>
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Live Session</p>
-                            <p className="text-sm font-bold text-emerald-800 dark:text-emerald-200">{activeSession.name}</p>
-                          </div>
-                        </div>
-                        <button onClick={endSession} className="text-xs font-bold text-red-500 hover:text-white bg-red-50 hover:bg-red-500 dark:bg-red-900/30 dark:hover:bg-red-600 px-4 py-2 rounded-lg transition-all duration-200 border border-red-200 dark:border-red-800">End Session</button>
+                      <div className="flex items-center justify-between bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-xl px-4 py-3">
+                        <span className="text-sm font-bold text-indigo-700 dark:text-indigo-300">Session: {activeSession.name}</span>
+                        <button onClick={endSession} className="text-xs font-bold text-red-500 hover:text-red-700 dark:hover:text-red-400 px-3 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors">End Session</button>
                       </div>
+                    ) : !lecturerAuth ? (
+                      <button onClick={() => setMode('admin')} className="text-sm font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 px-4 py-2 rounded-lg transition-colors">
+                        Log in to start a session
+                      </button>
                     ) : (
                       <div>
                         {showSessionInput ? (
-                          <div className="bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 dark:from-indigo-500/20 dark:via-purple-500/20 dark:to-pink-500/20 border border-indigo-200 dark:border-indigo-700 rounded-xl p-4 shadow-md">
-                            <p className="text-xs font-semibold uppercase tracking-wider text-indigo-500 dark:text-indigo-400 mb-3">Name your session</p>
-                            <div className="flex items-center gap-2">
-                              <input type="text" value={sessionNameInput} onChange={(e) => setSessionNameInput(e.target.value)} placeholder="e.g. Morning Lecture" className="flex-1 px-4 py-2.5 rounded-lg border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-indigo-500 outline-none placeholder-slate-400" />
-                              <button onClick={startSession} disabled={loading} className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-sm font-bold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50">Create</button>
-                              <button onClick={() => setShowSessionInput(false)} className="px-3 py-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold">✕</button>
-                            </div>
+                          <div className="flex items-center gap-2">
+                            <input type="text" value={sessionNameInput} onChange={(e) => setSessionNameInput(e.target.value)} placeholder="Session name" className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                            <button onClick={startSession} disabled={loading} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg transition-colors disabled:bg-indigo-400">Create</button>
+                            <button onClick={() => setShowSessionInput(false)} className="px-3 py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold">Cancel</button>
                           </div>
                         ) : (
-                          <button onClick={() => setShowSessionInput(true)} className="w-full group animate-subtle-pulse bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 rounded-xl p-[2px] transition-all duration-300 hover:scale-[1.02]">
-                            <div className="bg-white dark:bg-slate-900 rounded-[10px] px-5 py-4 flex items-center gap-4">
-                              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-lg shadow-lg">
-                                ▶
-                              </div>
-                              <div className="text-left">
-                                <p className="text-sm font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Start a Session</p>
-                                <p className="text-xs text-slate-400 dark:text-slate-500">Group attendance scans under one session for easy review</p>
-                              </div>
-                              <div className="ml-auto text-indigo-400 group-hover:translate-x-1 transition-transform duration-200 text-lg">→</div>
-                            </div>
-                          </button>
+                          <button onClick={() => setShowSessionInput(true)} className="text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 px-4 py-2 rounded-lg transition-colors">Start Session</button>
                         )}
                       </div>
                     )}
@@ -515,15 +558,16 @@ const App = () => {
                 </div>
               </div>
             </>
-          ) : !isAdminAuthenticated ? (
+          ) : !lecturerAuth ? (
             <div className="col-span-full flex items-center justify-center py-12">
               <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md text-center">
                 <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-6"><Lock size={32} /></div>
-                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">Admin Access</h2>
-                <p className="text-slate-500 dark:text-slate-400 mb-8">Enter your administrative password to continue</p>
-                <form onSubmit={handleAdminLogin} className="space-y-4">
+                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">Lecturer Login</h2>
+                <p className="text-slate-500 dark:text-slate-400 mb-8">Sign in with your lecturer account</p>
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <input type="text" value={loginUsername} onChange={(e) => setLoginUsername(e.target.value)} placeholder="Username" autoFocus className="w-full px-5 py-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all" />
                   <div className="relative">
-                    <input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} placeholder="Admin Password" autoFocus className="w-full px-5 py-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all pr-12" />
+                    <input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} placeholder="Password" className="w-full px-5 py-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all pr-12" />
                     <button type="submit" disabled={loading} className="absolute right-2 top-2 bottom-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 rounded-xl flex items-center justify-center transition-colors disabled:bg-indigo-400">
                       {loading ? <RefreshCw size={18} className="animate-spin" /> : <ArrowRight size={18} />}
                     </button>
@@ -537,12 +581,16 @@ const App = () => {
             <div className="col-span-full bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
               <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-6">
-                  <button onClick={() => setAdminTab('profiles')} className={`pb-2 text-sm font-bold transition-all border-b-2 ${adminTab === 'profiles' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Profiles ({profiles.length})</button>
-                  <button onClick={() => setAdminTab('history')} className={`pb-2 text-sm font-bold transition-all border-b-2 ${adminTab === 'history' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>History</button>
+                  {lecturerAuth?.role === 'super_admin' && (
+                    <>
+                      <button onClick={() => setAdminTab('profiles')} className={`pb-2 text-sm font-bold transition-all border-b-2 ${adminTab === 'profiles' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Profiles ({profiles.length})</button>
+                      <button onClick={() => setAdminTab('history')} className={`pb-2 text-sm font-bold transition-all border-b-2 ${adminTab === 'history' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>History</button>
+                    </>
+                  )}
                   <button onClick={() => { setAdminTab('sessions'); setSelectedSession(null); fetchSessions(); }} className={`pb-2 text-sm font-bold transition-all border-b-2 ${adminTab === 'sessions' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Sessions</button>
                 </div>
                 <div className="flex items-center gap-2">
-                   <button onClick={logoutAdmin} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 transition-colors">
+                   <button onClick={logout} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 transition-colors">
                     <X size={20} />
                   </button>
                 </div>
