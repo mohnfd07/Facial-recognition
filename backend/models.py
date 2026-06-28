@@ -12,12 +12,22 @@ class User(Base):
     # Store face encoding as a JSON string or comma-separated values
     encoding = Column(Text)
 
+class Lecturer(Base):
+    __tablename__ = "lecturers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+    role = Column(String, default="lecturer")  # "lecturer" or "super_admin"
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
 class Session(Base):
     __tablename__ = "sessions"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    lecturer_id = Column(Integer, ForeignKey("lecturers.id"), nullable=True)
     logs = relationship("RecognitionLog", back_populates="session")
 
 class RecognitionLog(Base):

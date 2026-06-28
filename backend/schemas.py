@@ -2,6 +2,16 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 
+class LecturerLogin(BaseModel):
+    username: str
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    role: str
+    username: str
+
 class UserBase(BaseModel):
     name: str
     matric_number: str

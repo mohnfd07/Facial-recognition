@@ -15,14 +15,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# Admin password from environment variable
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
-
-def verify_admin(x_admin_password: str = Header(None)):
-    if x_admin_password != ADMIN_PASSWORD:
-        raise HTTPException(status_code=401, detail="Invalid admin password")
-    return True
-
 # Ensure backend directory is in sys.path
 current_dir = os.path.dirname(os.path.realpath(__file__))
 if current_dir not in sys.path:
@@ -33,9 +25,17 @@ import models
 import schemas
 import utils
 from database import engine, get_db
+from auth import get_current_lecturer, require_super_admin, verify_password, create_access_token, seed_super_admin
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
+
+from database import SessionLocal
+_db = SessionLocal()
+try:
+    seed_super_admin(_db)
+finally:
+    _db.close()
 
 app = FastAPI(title="Facial Recognition API")
 
@@ -51,6 +51,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.post("/auth/login", response_model=schemas.Token)
+def login(credentials: schemas.LecturerLogin, db: Session = Depends(get_db)):
+    lecturer = db.query(models.Lecturer).filter(models.Lecturer.username == credentials.username).first()
+    if not lecturer or not verify_password(credentials.password, lecturer.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    token = create_access_token({"sub": lecturer.username})
+    return {"access_token": token, "token_type": "bearer", "role": lecturer.role, "username": lecturer.username}
 
 @app.post("/register", response_model=schemas.User)
 async def register_user(name: str = Form(...), matric_number: str = Form(...), file: UploadFile = File(...), db: Session = Depends(get_db)):
@@ -143,11 +151,11 @@ async def recognize_user(file: UploadFile = File(...), session_id: Optional[str]
         return {"match": False, "detail": "No match found"}
 
 @app.get("/profiles", response_model=List[schemas.User])
-def get_profiles(db: Session = Depends(get_db), authenticated: bool = Depends(verify_admin)):
+def get_profiles(db: Session = Depends(get_db), current=Depends(require_super_admin)):
     return db.query(models.User).all()
 
 @app.delete("/profiles/{user_id}")
-def delete_profile(user_id: int, db: Session = Depends(get_db), authenticated: bool = Depends(verify_admin)):
+def delete_profile(user_id: int, db: Session = Depends(get_db), current=Depends(require_super_admin)):
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -156,35 +164,43 @@ def delete_profile(user_id: int, db: Session = Depends(get_db), authenticated: b
     return {"message": f"User {user_id} deleted"}
 
 @app.delete("/profiles")
-def delete_all_profiles(db: Session = Depends(get_db), authenticated: bool = Depends(verify_admin)):
+def delete_all_profiles(db: Session = Depends(get_db), current=Depends(require_super_admin)):
     db.query(models.User).delete()
     db.commit()
     return {"message": "All profiles deleted"}
 
 @app.get("/logs", response_model=List[schemas.RecognitionLog])
-def get_logs(db: Session = Depends(get_db), authenticated: bool = Depends(verify_admin)):
+def get_logs(db: Session = Depends(get_db), current=Depends(require_super_admin)):
     return db.query(models.RecognitionLog).order_by(models.RecognitionLog.timestamp.desc()).limit(100).all()
 
 @app.delete("/logs")
-def delete_all_logs(db: Session = Depends(get_db), authenticated: bool = Depends(verify_admin)):
+def delete_all_logs(db: Session = Depends(get_db), current=Depends(require_super_admin)):
     db.query(models.RecognitionLog).delete()
     db.commit()
     return {"message": "All logs cleared"}
 
 @app.post("/sessions", response_model=schemas.Session)
-def create_session(session: schemas.SessionCreate, db: Session = Depends(get_db)):
-    new_session = models.Session(name=session.name)
+def create_session(session: schemas.SessionCreate, db: Session = Depends(get_db), current=Depends(get_current_lecturer)):
+    new_session = models.Session(name=session.name, lecturer_id=current.id)
     db.add(new_session)
     db.commit()
     db.refresh(new_session)
     return new_session
 
 @app.get("/sessions", response_model=List[schemas.Session])
-def get_sessions(db: Session = Depends(get_db), authenticated: bool = Depends(verify_admin)):
-    return db.query(models.Session).order_by(models.Session.created_at.desc()).all()
+def get_sessions(db: Session = Depends(get_db), current=Depends(get_current_lecturer)):
+    query = db.query(models.Session)
+    if current.role != "super_admin":
+        query = query.filter(models.Session.lecturer_id == current.id)
+    return query.order_by(models.Session.created_at.desc()).all()
 
 @app.get("/sessions/{session_id}/logs", response_model=List[schemas.RecognitionLog])
-def get_session_logs(session_id: int, db: Session = Depends(get_db), authenticated: bool = Depends(verify_admin)):
+def get_session_logs(session_id: int, db: Session = Depends(get_db), current=Depends(get_current_lecturer)):
+    session_obj = db.query(models.Session).filter(models.Session.id == session_id).first()
+    if not session_obj:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if current.role != "super_admin" and session_obj.lecturer_id != current.id:
+        raise HTTPException(status_code=403, detail="Not authorized to view this session")
     return db.query(models.RecognitionLog).filter(
         models.RecognitionLog.session_id == session_id
     ).order_by(models.RecognitionLog.timestamp.desc()).all()
