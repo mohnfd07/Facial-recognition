@@ -86,12 +86,14 @@ const App = () => {
     }
   }, [lecturerAuth]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (lecturerAuth && lecturerAuth.role !== 'super_admin' && adminTab !== 'sessions') {
       setAdminTab('sessions');
     }
   }, [lecturerAuth]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (lecturerAuth && mode === 'admin') {
       if (lecturerAuth.role === 'super_admin') {
