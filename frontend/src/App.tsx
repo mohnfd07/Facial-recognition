@@ -124,8 +124,11 @@ const App = () => {
       });
       setLoginUsername('');
       setLoginPassword('');
+      if (response.data.role !== 'super_admin') {
+        setMode('recognize');
+      }
     } catch (err: any) {
-      setError(err.response?.status === 401 ? 'Invalid username or password' : 'Login failed');
+      setError(err.response?.data?.detail || 'Login failed');
     } finally {
       setLoading(false);
     }
