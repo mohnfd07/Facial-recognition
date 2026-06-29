@@ -564,16 +564,19 @@ const App = () => {
                         Log in to start a session
                       </button>
                     ) : (
-                      <div>
-                        {showSessionInput ? (
-                          <div className="flex items-center gap-2">
-                            <input type="text" value={sessionNameInput} onChange={(e) => setSessionNameInput(e.target.value)} placeholder="Session name" className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
-                            <button onClick={startSession} disabled={loading} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg transition-colors disabled:bg-indigo-400">Create</button>
-                            <button onClick={() => setShowSessionInput(false)} className="px-3 py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold">Cancel</button>
-                          </div>
-                        ) : (
-                          <button onClick={() => setShowSessionInput(true)} className="text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 px-4 py-2 rounded-lg transition-colors">Start Session</button>
-                        )}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          {showSessionInput ? (
+                            <div className="flex items-center gap-2">
+                              <input type="text" value={sessionNameInput} onChange={(e) => setSessionNameInput(e.target.value)} placeholder="Session name" className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                              <button onClick={startSession} disabled={loading} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg transition-colors disabled:bg-indigo-400">Create</button>
+                              <button onClick={() => setShowSessionInput(false)} className="px-3 py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold">Cancel</button>
+                            </div>
+                          ) : (
+                            <button onClick={() => setShowSessionInput(true)} className="text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 px-4 py-2 rounded-lg transition-colors">Start Session</button>
+                          )}
+                        </div>
+                        <button onClick={logout} className="text-xs font-bold text-red-500 hover:text-red-700 dark:hover:text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors">Logout</button>
                       </div>
                     )}
                   </div>
