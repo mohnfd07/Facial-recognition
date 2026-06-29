@@ -27,11 +27,14 @@ const API_BASE_URL = (window.location.hostname === 'localhost' || window.locatio
 
 const App = () => {
   const [mode, setMode] = useState<'recognize' | 'register' | 'admin'>('recognize');
-  const [adminTab, setAdminTab] = useState<'profiles' | 'history' | 'sessions'>('profiles');
+  const [adminTab, setAdminTab] = useState<'profiles' | 'history' | 'sessions' | 'lecturers'>('profiles');
   const [lecturerAuth, setLecturerAuth] = useState<{token: string; username: string; role: string} | null>(() => {
     const saved = localStorage.getItem('lecturerAuth');
     return saved ? JSON.parse(saved) : null;
   });
+  const [authView, setAuthView] = useState<'login' | 'signup'>('login');
+  const [signupSuccess, setSignupSuccess] = useState(false);
+  const [lecturers, setLecturers] = useState<any[]>([]);
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [name, setName] = useState('');
@@ -98,6 +101,7 @@ const App = () => {
       if (lecturerAuth.role === 'super_admin') {
         fetchProfiles();
         fetchLogs();
+        fetchLecturers();
       }
       fetchSessions();
     }
@@ -122,6 +126,25 @@ const App = () => {
       setLoginPassword('');
     } catch (err: any) {
       setError(err.response?.status === 401 ? 'Invalid username or password' : 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignup = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      await axios.post(`${API_BASE_URL}/auth/signup`, {
+        username: loginUsername,
+        password: loginPassword
+      });
+      setSignupSuccess(true);
+      setLoginUsername('');
+      setLoginPassword('');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Signup failed');
     } finally {
       setLoading(false);
     }
@@ -205,6 +228,71 @@ const App = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchLecturers = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API_BASE_URL}/lecturers`, {
+        headers: { Authorization: `Bearer ${lecturerAuth?.token}` }
+      });
+      setLecturers(response.data);
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        setLecturerAuth(null);
+        setMode('recognize');
+        return;
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const approveLecturer = async (id: number) => {
+    setLoading(true);
+    try {
+      await axios.post(`${API_BASE_URL}/lecturers/${id}/approve`, {}, {
+        headers: { Authorization: `Bearer ${lecturerAuth?.token}` }
+      });
+      fetchLecturers();
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        setLecturerAuth(null);
+        setMode('recognize');
+        return;
+      }
+      setError('Failed to approve lecturer');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const rejectLecturer = async (id: number) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Reject Lecturer',
+      message: 'This will permanently remove this lecturer account. Are you sure?',
+      isDangerous: true,
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          await axios.delete(`${API_BASE_URL}/lecturers/${id}`, {
+            headers: { Authorization: `Bearer ${lecturerAuth?.token}` }
+          });
+          setLecturers(lecturers.filter(l => l.id !== id));
+        } catch (err: any) {
+          if (err.response?.status === 401) {
+            setLecturerAuth(null);
+            setMode('recognize');
+            return;
+          }
+          setError('Failed to remove lecturer');
+        } finally {
+          setLoading(false);
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
   const viewSession = async (session: any) => {
@@ -397,6 +485,8 @@ const App = () => {
   const logout = () => {
     setLecturerAuth(null);
     setMode('recognize');
+    setAuthView('login');
+    setSignupSuccess(false);
   };
 
   const toggleAdmin = () => {
@@ -564,19 +654,32 @@ const App = () => {
             <div className="col-span-full flex items-center justify-center py-12">
               <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md text-center">
                 <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-6"><Lock size={32} /></div>
-                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">Lecturer Login</h2>
-                <p className="text-slate-500 dark:text-slate-400 mb-8">Sign in with your lecturer account</p>
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <input type="text" value={loginUsername} onChange={(e) => setLoginUsername(e.target.value)} placeholder="Username" autoFocus className="w-full px-5 py-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all" />
-                  <div className="relative">
-                    <input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} placeholder="Password" className="w-full px-5 py-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all pr-12" />
-                    <button type="submit" disabled={loading} className="absolute right-2 top-2 bottom-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 rounded-xl flex items-center justify-center transition-colors disabled:bg-indigo-400">
-                      {loading ? <RefreshCw size={18} className="animate-spin" /> : <ArrowRight size={18} />}
+                {signupSuccess ? (
+                  <>
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">Account Created</h2>
+                    <p className="text-slate-500 dark:text-slate-400 mb-8">Your account is pending approval. You'll be able to log in once a super admin approves it.</p>
+                    <button onClick={() => { setSignupSuccess(false); setAuthView('login'); }} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors">Back to Login</button>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">{authView === 'login' ? 'Lecturer Login' : 'Lecturer Signup'}</h2>
+                    <p className="text-slate-500 dark:text-slate-400 mb-8">{authView === 'login' ? 'Sign in with your lecturer account' : 'Request a lecturer account'}</p>
+                    <form onSubmit={authView === 'login' ? handleLogin : handleSignup} className="space-y-4">
+                      <input type="text" value={loginUsername} onChange={(e) => setLoginUsername(e.target.value)} placeholder="Username" autoFocus className="w-full px-5 py-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all" />
+                      <div className="relative">
+                        <input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} placeholder="Password" className="w-full px-5 py-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all pr-12" />
+                        <button type="submit" disabled={loading} className="absolute right-2 top-2 bottom-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 rounded-xl flex items-center justify-center transition-colors disabled:bg-indigo-400">
+                          {loading ? <RefreshCw size={18} className="animate-spin" /> : <ArrowRight size={18} />}
+                        </button>
+                      </div>
+                      {error && <p className="text-red-500 text-sm font-medium">{error}</p>}
+                    </form>
+                    <button onClick={() => { setAuthView(authView === 'login' ? 'signup' : 'login'); setError(null); }} className="mt-4 text-indigo-600 dark:text-indigo-400 text-sm font-bold hover:underline">
+                      {authView === 'login' ? "Don't have an account? Sign up" : "Already have an account? Log in"}
                     </button>
-                  </div>
-                  {error && <p className="text-red-500 text-sm font-medium">{error}</p>}
-                </form>
-                <button onClick={() => setMode('recognize')} className="mt-8 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold flex items-center justify-center gap-2 mx-auto"><X size={16} /> Cancel</button>
+                  </>
+                )}
+                <button onClick={() => setMode('recognize')} className="mt-8 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold flex items-center justify-center gap-2 mx-auto block"><X size={16} className="inline" /> Cancel</button>
               </div>
             </div>
           ) : (
@@ -587,6 +690,9 @@ const App = () => {
                     <>
                       <button onClick={() => setAdminTab('profiles')} className={`pb-2 text-sm font-bold transition-all border-b-2 ${adminTab === 'profiles' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Profiles ({profiles.length})</button>
                       <button onClick={() => setAdminTab('history')} className={`pb-2 text-sm font-bold transition-all border-b-2 ${adminTab === 'history' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>History</button>
+                      <button onClick={() => setAdminTab('lecturers')} className={`pb-2 text-sm font-bold transition-all border-b-2 ${adminTab === 'lecturers' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                        Lecturers{lecturers.filter(l => l.status === 'pending').length > 0 && ` (${lecturers.filter(l => l.status === 'pending').length})`}
+                      </button>
                     </>
                   )}
                   <button onClick={() => { setAdminTab('sessions'); setSelectedSession(null); fetchSessions(); }} className={`pb-2 text-sm font-bold transition-all border-b-2 ${adminTab === 'sessions' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Sessions</button>
@@ -673,7 +779,7 @@ const App = () => {
                       </table>
                     </div>
                   </div>
-                ) : (
+                ) : adminTab === 'sessions' ? (
                   <div className="space-y-4">
                     {selectedSession ? (
                       <div>
@@ -729,6 +835,37 @@ const App = () => {
                             ))}
                           </div>
                         )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Lecturer Accounts</h3>
+                      <button onClick={fetchLecturers} disabled={loading} className="text-indigo-600 dark:text-indigo-400 text-sm font-bold flex items-center gap-2 px-3 py-1.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all">
+                        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh
+                      </button>
+                    </div>
+                    {lecturers.length === 0 ? (
+                      <div className="py-12 text-center text-slate-400">No lecturer accounts yet</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {lecturers.map((l) => (
+                          <div key={l.id} className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4">
+                            <div>
+                              <div className="font-bold text-sm text-slate-800 dark:text-slate-200">{l.username}</div>
+                              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${l.status === 'approved' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30'}`}>{l.status}</span>
+                            </div>
+                            <div className="flex gap-2">
+                              {l.status !== 'approved' && (
+                                <button onClick={() => approveLecturer(l.id)} className="text-emerald-600 text-sm font-bold flex items-center gap-1 px-3 py-1.5 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg transition-all">Approve</button>
+                              )}
+                              <button onClick={() => rejectLecturer(l.id)} className="text-red-500 text-sm font-bold flex items-center gap-1 px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-all">
+                                <Trash2 size={14} /> {l.status === 'approved' ? 'Remove' : 'Reject'}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>

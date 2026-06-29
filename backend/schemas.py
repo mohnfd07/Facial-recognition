@@ -6,11 +6,25 @@ class LecturerLogin(BaseModel):
     username: str
     password: str
 
+class LecturerSignup(BaseModel):
+    username: str
+    password: str
+
 class Token(BaseModel):
     access_token: str
     token_type: str
     role: str
     username: str
+
+class Lecturer(BaseModel):
+    id: int
+    username: str
+    role: str
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 class UserBase(BaseModel):
     name: str

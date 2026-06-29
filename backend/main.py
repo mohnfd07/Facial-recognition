@@ -25,7 +25,7 @@ import models
 import schemas
 import utils
 from database import engine, get_db
-from auth import get_current_lecturer, require_super_admin, verify_password, create_access_token, seed_super_admin
+from auth import get_current_lecturer, require_super_admin, verify_password, hash_password, create_access_token, seed_super_admin
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
@@ -57,8 +57,52 @@ def login(credentials: schemas.LecturerLogin, db: Session = Depends(get_db)):
     lecturer = db.query(models.Lecturer).filter(models.Lecturer.username == credentials.username).first()
     if not lecturer or not verify_password(credentials.password, lecturer.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid username or password")
+    if lecturer.role != "super_admin" and lecturer.status != "approved":
+        detail = "Your account is pending approval" if lecturer.status == "pending" else "Your account has been rejected"
+        raise HTTPException(status_code=403, detail=detail)
     token = create_access_token({"sub": lecturer.username})
     return {"access_token": token, "token_type": "bearer", "role": lecturer.role, "username": lecturer.username}
+
+@app.post("/auth/signup", response_model=schemas.Lecturer)
+def signup(credentials: schemas.LecturerSignup, db: Session = Depends(get_db)):
+    existing = db.query(models.Lecturer).filter(models.Lecturer.username == credentials.username).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already taken")
+    new_lecturer = models.Lecturer(
+        username=credentials.username,
+        hashed_password=hash_password(credentials.password),
+        role="lecturer",
+        status="pending"
+    )
+    db.add(new_lecturer)
+    db.commit()
+    db.refresh(new_lecturer)
+    return new_lecturer
+
+@app.get("/lecturers", response_model=List[schemas.Lecturer])
+def get_lecturers(db: Session = Depends(get_db), current=Depends(require_super_admin)):
+    return db.query(models.Lecturer).filter(models.Lecturer.role != "super_admin").order_by(models.Lecturer.created_at.desc()).all()
+
+@app.post("/lecturers/{lecturer_id}/approve", response_model=schemas.Lecturer)
+def approve_lecturer(lecturer_id: int, db: Session = Depends(get_db), current=Depends(require_super_admin)):
+    lecturer = db.query(models.Lecturer).filter(models.Lecturer.id == lecturer_id).first()
+    if not lecturer:
+        raise HTTPException(status_code=404, detail="Lecturer not found")
+    lecturer.status = "approved"
+    db.commit()
+    db.refresh(lecturer)
+    return lecturer
+
+@app.delete("/lecturers/{lecturer_id}")
+def remove_lecturer(lecturer_id: int, db: Session = Depends(get_db), current=Depends(require_super_admin)):
+    lecturer = db.query(models.Lecturer).filter(models.Lecturer.id == lecturer_id).first()
+    if not lecturer:
+        raise HTTPException(status_code=404, detail="Lecturer not found")
+    if lecturer.role == "super_admin":
+        raise HTTPException(status_code=403, detail="Cannot remove super admin")
+    db.delete(lecturer)
+    db.commit()
+    return {"message": f"Lecturer {lecturer_id} removed"}
 
 @app.post("/register", response_model=schemas.User)
 async def register_user(name: str = Form(...), matric_number: str = Form(...), file: UploadFile = File(...), db: Session = Depends(get_db)):

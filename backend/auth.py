@@ -41,6 +41,8 @@ def get_current_lecturer(authorization: str = Header(None), db: DBSession = Depe
     lecturer = db.query(models.Lecturer).filter(models.Lecturer.username == username).first()
     if lecturer is None:
         raise HTTPException(status_code=401, detail="Lecturer not found")
+    if lecturer.role != "super_admin" and lecturer.status != "approved":
+        raise HTTPException(status_code=403, detail="Account not approved")
     return lecturer
 
 def require_super_admin(current: models.Lecturer = Depends(get_current_lecturer)) -> models.Lecturer:
@@ -59,7 +61,8 @@ def seed_super_admin(db: DBSession):
     admin = models.Lecturer(
         username=username,
         hashed_password=hash_password(password),
-        role="super_admin"
+        role="super_admin",
+        status="approved"
     )
     db.add(admin)
     db.commit()
