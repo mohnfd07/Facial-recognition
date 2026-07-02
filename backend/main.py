@@ -233,10 +233,20 @@ def create_session(session: schemas.SessionCreate, db: Session = Depends(get_db)
 
 @app.get("/sessions", response_model=List[schemas.Session])
 def get_sessions(db: Session = Depends(get_db), current=Depends(get_current_lecturer)):
-    query = db.query(models.Session)
+    query = db.query(models.Session, models.Lecturer.username).outerjoin(models.Lecturer, models.Session.lecturer_id == models.Lecturer.id)
     if current.role != "super_admin":
         query = query.filter(models.Session.lecturer_id == current.id)
-    return query.order_by(models.Session.created_at.desc()).all()
+    results = query.order_by(models.Session.created_at.desc()).all()
+    sessions = []
+    for session_obj, username in results:
+        session_dict = {
+            "id": session_obj.id,
+            "name": session_obj.name,
+            "created_at": session_obj.created_at,
+            "lecturer_username": username,
+        }
+        sessions.append(session_dict)
+    return sessions
 
 @app.get("/sessions/{session_id}/logs", response_model=List[schemas.RecognitionLog])
 def get_session_logs(session_id: int, db: Session = Depends(get_db), current=Depends(get_current_lecturer)):

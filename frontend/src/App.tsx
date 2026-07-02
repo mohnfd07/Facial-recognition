@@ -836,6 +836,7 @@ const App = () => {
                             {sessions.map((s) => (
                               <button key={s.id} onClick={() => viewSession(s)} className="w-full text-left p-4 rounded-xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                 <div className="font-bold text-sm text-slate-800 dark:text-slate-200">{s.name}</div>
+                                {s.lecturer_username && <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">{s.lecturer_username}</div>}
                                 <div className="text-[10px] text-slate-400">{new Date(s.created_at.endsWith('Z') ? s.created_at : s.created_at + 'Z').toLocaleString()}</div>
                               </button>
                             ))}

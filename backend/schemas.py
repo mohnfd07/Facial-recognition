@@ -48,6 +48,7 @@ class SessionCreate(SessionBase):
 class Session(SessionBase):
     id: int
     created_at: datetime
+    lecturer_username: Optional[str] = None
 
     class Config:
         from_attributes = True
