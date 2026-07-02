@@ -402,6 +402,63 @@ const App = () => {
     });
   };
 
+  const deleteSession = async (sessionId: number) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Clear Session',
+      message: 'Are you sure you want to clear this session? All associated logs will also be removed.',
+      isDangerous: true,
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          await axios.delete(`${API_BASE_URL}/sessions/${sessionId}`, {
+            headers: { Authorization: `Bearer ${lecturerAuth?.token}` }
+          });
+          setSelectedSession(null);
+          fetchSessions();
+        } catch (err: any) {
+          if (err.response?.status === 401) {
+            setLecturerAuth(null);
+            setMode('recognize');
+            return;
+          }
+          setError('Failed to clear session');
+        } finally {
+          setLoading(false);
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
+  const clearAllSessions = async () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Clear All Sessions',
+      message: 'Are you sure you want to clear all sessions? All associated logs will also be removed.',
+      isDangerous: true,
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          await axios.delete(`${API_BASE_URL}/sessions`, {
+            headers: { Authorization: `Bearer ${lecturerAuth?.token}` }
+          });
+          fetchSessions();
+        } catch (err: any) {
+          if (err.response?.status === 401) {
+            setLecturerAuth(null);
+            setMode('recognize');
+            return;
+          }
+          setError('Failed to clear sessions');
+        } finally {
+          setLoading(false);
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
   const checkImageQuality = (canvas: HTMLCanvasElement): string | null => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
@@ -789,9 +846,14 @@ const App = () => {
                   <div className="space-y-4">
                     {selectedSession ? (
                       <div>
-                        <div className="flex items-center gap-4 mb-4">
-                          <button onClick={() => setSelectedSession(null)} className="text-indigo-600 dark:text-indigo-400 text-sm font-bold flex items-center gap-2 px-3 py-1.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all">&larr; Back</button>
-                          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{selectedSession.name}</h3>
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-4">
+                            <button onClick={() => setSelectedSession(null)} className="text-indigo-600 dark:text-indigo-400 text-sm font-bold flex items-center gap-2 px-3 py-1.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all">&larr; Back</button>
+                            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{selectedSession.name}</h3>
+                          </div>
+                          <button onClick={() => deleteSession(selectedSession.id)} className="text-red-500 text-sm font-bold flex items-center gap-2 px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-all">
+                            <Trash2 size={16} /> Clear Session
+                          </button>
                         </div>
                         <div className="overflow-x-auto">
                           <table className="w-full text-left text-sm">
@@ -825,9 +887,14 @@ const App = () => {
                       <div>
                         <div className="flex justify-between items-center mb-4">
                           <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Sessions</h3>
-                          <button onClick={fetchSessions} disabled={loading} className="text-indigo-600 dark:text-indigo-400 text-sm font-bold flex items-center gap-2 px-3 py-1.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all">
-                            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh
-                          </button>
+                          <div className="flex gap-2">
+                            <button onClick={fetchSessions} disabled={loading} className="text-indigo-600 dark:text-indigo-400 text-sm font-bold flex items-center gap-2 px-3 py-1.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all">
+                              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh
+                            </button>
+                            <button onClick={clearAllSessions} className="text-red-500 text-sm font-bold flex items-center gap-2 px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-all">
+                              <Trash2 size={16} /> Clear All
+                            </button>
+                          </div>
                         </div>
                         {sessions.length === 0 ? (
                           <div className="py-12 text-center text-slate-400">No sessions found</div>

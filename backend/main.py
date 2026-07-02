@@ -259,6 +259,30 @@ def get_session_logs(session_id: int, db: Session = Depends(get_db), current=Dep
         models.RecognitionLog.session_id == session_id
     ).order_by(models.RecognitionLog.timestamp.desc()).all()
 
+@app.delete("/sessions/{session_id}")
+def delete_session(session_id: int, db: Session = Depends(get_db), current=Depends(get_current_lecturer)):
+    session_obj = db.query(models.Session).filter(models.Session.id == session_id).first()
+    if not session_obj:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if current.role != "super_admin" and session_obj.lecturer_id != current.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this session")
+    db.query(models.RecognitionLog).filter(models.RecognitionLog.session_id == session_id).delete()
+    db.delete(session_obj)
+    db.commit()
+    return {"message": f"Session {session_id} deleted"}
+
+@app.delete("/sessions")
+def delete_all_sessions(db: Session = Depends(get_db), current=Depends(get_current_lecturer)):
+    query = db.query(models.Session)
+    if current.role != "super_admin":
+        query = query.filter(models.Session.lecturer_id == current.id)
+    session_ids = [s.id for s in query.all()]
+    if session_ids:
+        db.query(models.RecognitionLog).filter(models.RecognitionLog.session_id.in_(session_ids)).delete(synchronize_session=False)
+        query.delete(synchronize_session=False)
+    db.commit()
+    return {"message": "All sessions deleted"}
+
 if __name__ == "__main__":
     import uvicorn
     # Get port from environment variable (standard for Railway/Render)
